@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/npcs.json",
+  "title": "NPC",
+  "description": "REOSERV data/pub/npcs/<id>.json — one record per file. Combines EnfRecord plus drop, talk, and per-NPC rate overrides (drops loaded by src/utils/load_drop_file.rs, talk by load_talk_file.rs, rates by load_npc_rates_file.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "graphic_id": { "type": "integer", "minimum": 0 },
+    "race": { "type": "integer", "minimum": 0 },
+    "boss": { "type": "boolean" },
+    "child": { "type": "boolean" },
+    "type": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "NpcType enum (eolib): 0=Friendly,1=Passive,2=Aggressive,3=Boss,etc."
+    },
+    "behavior_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Behavior id used by shops/inns/skill_masters/etc. to bind to this NPC."
+    },
+    "hp": { "type": "integer", "minimum": 0 },
+    "tp": { "type": "integer", "minimum": 0 },
+    "min_damage": { "type": "integer", "minimum": 0 },
+    "max_damage": { "type": "integer", "minimum": 0 },
+    "accuracy": { "type": "integer" },
+    "evade": { "type": "integer" },
+    "armor": { "type": "integer" },
+    "return_damage": { "type": "integer" },
+    "element": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Element enum (eolib)."
+    },
+    "element_damage": { "type": "integer", "minimum": 0 },
+    "element_weakness": { "type": "integer", "minimum": 0 },
+    "element_weakness_damage": { "type": "integer", "minimum": 0 },
+    "level": { "type": "integer", "minimum": 0 },
+    "experience": { "type": "integer", "minimum": 0 },
+
+    "drops": {
+      "type": "array",
+      "description": "Item drop table (load_drop_file.rs). Empty = NPC drops nothing.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item_id", "rate"],
+        "properties": {
+          "item_id": { "type": "integer", "minimum": 1 },
+          "min_amount": { "type": "integer", "minimum": 0 },
+          "max_amount": { "type": "integer", "minimum": 0 },
+          "rate": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Drop rate; integer share, NOT a percentage. See GlobalDrops.ron for the divisor."
+          }
+        }
+      }
+    },
+    "talk_messages": {
+      "type": "array",
+      "description": "Random ambient lines this NPC speaks (load_talk_file.rs). Empty = silent.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "talk_rate": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Talk chance roll (load_talk_file.rs). 0 with non-empty talk_messages = unused; lift before shipping."
+    },
+
+    "attack_rate_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Per-NPC attack cadence in milliseconds (load_npc_rates_file.rs). Defaults to 1000 if absent."
+    },
+    "move_rate_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Per-NPC movement cadence in milliseconds (load_npc_rates_file.rs). Defaults to 1500 if absent."
+    },
+    "reputation_grant": {
+      "type": "integer",
+      "description": "Reputation points granted to the killer per kill (load_npc_rates_file.rs). Defaults to 1 if absent."
+    }
+  }
+}

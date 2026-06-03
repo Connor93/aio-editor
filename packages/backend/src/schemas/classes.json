@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/classes.json",
+  "title": "Class",
+  "description": "REOSERV data/pub/classes/<id>.json — one EcfRecord per file. See src/utils/load_class_file.rs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable class name shown in-game."
+    },
+    "parent_type": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Parent class id. 0 for base classes."
+    },
+    "stat_group": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Stat group bucket the class belongs to."
+    },
+    "str": { "type": "integer", "minimum": 0 },
+    "intl": { "type": "integer", "minimum": 0 },
+    "wis": { "type": "integer", "minimum": 0 },
+    "agi": { "type": "integer", "minimum": 0 },
+    "con": { "type": "integer", "minimum": 0 },
+    "cha": { "type": "integer", "minimum": 0 }
+  }
+}

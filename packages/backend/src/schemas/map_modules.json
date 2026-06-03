@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/map_modules.json",
+  "title": "Map modules",
+  "description": "REOSERV data/pub/map_modules.json — composition definitions for Phase 4 dungeons. See src/utils/load_map_modules_file.rs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["modules"],
+  "definitions": {
+    "compositionRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Min/max room counts the composition engine respects when stitching layouts.",
+      "properties": {
+        "min_regular_rooms": { "type": "integer", "minimum": 0 },
+        "max_regular_rooms": { "type": "integer", "minimum": 0 },
+        "min_boss_rooms": { "type": "integer", "minimum": 0 },
+        "max_boss_rooms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "roomDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["emf_id", "room_type"],
+      "properties": {
+        "emf_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "EMF map id this room is built from."
+        },
+        "room_type": {
+          "type": "string",
+          "enum": ["entrance", "regular", "boss", "exit"],
+          "description": "Role this room plays in the composition."
+        },
+        "connection_points": {
+          "type": "array",
+          "description": "Author-named anchors that the stitcher pairs across adjacent rooms.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "mapModule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "rooms"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "layout_strategy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Composition strategy id. \"linear\" is the only strategy in Phase 2."
+        },
+        "composition_rules": { "$ref": "#/definitions/compositionRules" },
+        "rooms": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/roomDef" }
+        }
+      }
+    }
+  },
+  "properties": {
+    "modules": {
+      "type": "object",
+      "description": "Module id -> definition. Module ids are the keys consumers pass to compose_*.",
+      "additionalProperties": { "$ref": "#/definitions/mapModule" }
+    }
+  }
+}

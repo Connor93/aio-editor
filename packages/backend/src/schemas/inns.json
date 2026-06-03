@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/inns.json",
+  "title": "Inn",
+  "description": "REOSERV data/pub/inns/<id>.json — one InnRecord per file. See src/utils/load_inn_file.rs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["behavior_id", "name", "questions"],
+  "properties": {
+    "behavior_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Behavior id wired to the innkeeper NPC in the map."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Home identifier matching the new_character home + character.home string."
+    },
+    "spawn_map": { "type": "integer", "minimum": 0 },
+    "spawn_x": { "type": "integer", "minimum": 0 },
+    "spawn_y": { "type": "integer", "minimum": 0 },
+    "sleep_map": { "type": "integer", "minimum": 0 },
+    "sleep_x": { "type": "integer", "minimum": 0 },
+    "sleep_y": { "type": "integer", "minimum": 0 },
+    "alternate_spawn_enabled": { "type": "boolean" },
+    "alternate_spawn_map": { "type": "integer", "minimum": 0 },
+    "alternate_spawn_x": { "type": "integer", "minimum": 0 },
+    "alternate_spawn_y": { "type": "integer", "minimum": 0 },
+    "questions": {
+      "type": "array",
+      "description": "Security questions asked when registering this home.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question", "answer"],
+        "properties": {
+          "question": { "type": "string", "minLength": 1 },
+          "answer": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

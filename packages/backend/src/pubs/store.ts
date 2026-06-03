@@ -75,12 +75,31 @@ export async function listPubTypes(): Promise<PubTypeInfo[]> {
 export interface PubFileInfo {
   filename: string;
   staged: boolean;
+  /** Extracted from the file's top-level `name` field (best-effort). Null if
+   *  the file is unreadable, not valid JSON, or has no name field. */
+  name: string | null;
 }
 
 async function readDirIfExists(path: string): Promise<string[]> {
   if (!existsSync(path)) return [];
   const entries = await readdir(path);
   return entries.filter((e) => e.endsWith(".json"));
+}
+
+/** Read the top-level `name` field from a JSON file without keeping the rest
+ *  of the parsed value around. Best-effort: any IO or parse error yields null.
+ *  Used by listPubFiles to render "<name> (<filename>)" in the file picker. */
+async function extractName(path: string): Promise<string | null> {
+  try {
+    const content = await readFile(path, "utf8");
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === "object" && typeof parsed.name === "string") {
+      return parsed.name;
+    }
+  } catch {
+    // unreadable or not JSON — listing should not fail
+  }
+  return null;
 }
 
 function isExistingDirOrSymlink(path: string): boolean {
@@ -103,17 +122,46 @@ export async function listPubFiles(type: string): Promise<PubFileInfo[]> {
     const stagedFiles = await readDirIfExists(stagingDir);
     const stagedSet = new Set(stagedFiles);
 
-    const all = new Set([...liveFiles, ...stagedFiles]);
-    return [...all]
-      .sort((a, b) => a.localeCompare(b))
-      .map((filename) => ({ filename, staged: stagedSet.has(filename) }));
+    const all = [...new Set([...liveFiles, ...stagedFiles])];
+
+    // Read name from staging if present, otherwise from live. This is N file
+    // reads per request (items has ~900); fine for an admin tool but worth
+    // caching with mtime invalidation if listings ever feel slow.
+    const infos = await Promise.all(
+      all.map(async (filename) => {
+        const path = stagedSet.has(filename)
+          ? join(stagingDir, filename)
+          : join(liveDir, filename);
+        return {
+          filename,
+          staged: stagedSet.has(filename),
+          name: await extractName(path),
+        } satisfies PubFileInfo;
+      })
+    );
+
+    infos.sort((a, b) => {
+      const an = a.name ?? a.filename;
+      const bn = b.name ?? b.filename;
+      return an.localeCompare(bn);
+    });
+    return infos;
   }
 
   const singleFileName = `${type}.json`;
   const liveFile = join(config.pubDataDir, singleFileName);
   if (existsSync(liveFile)) {
     const stagedExists = existsSync(join(config.stagingDir, singleFileName));
-    return [{ filename: singleFileName, staged: stagedExists }];
+    const path = stagedExists
+      ? join(config.stagingDir, singleFileName)
+      : liveFile;
+    return [
+      {
+        filename: singleFileName,
+        staged: stagedExists,
+        name: await extractName(path),
+      },
+    ];
   }
 
   throw new PubNotFoundError(`unknown pub type: ${type}`);

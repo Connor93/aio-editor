@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/skill_masters.json",
+  "title": "Skill master",
+  "description": "REOSERV data/pub/skill_masters/<id>.json — one SkillMasterRecord per file. See src/utils/load_skill_master_file.rs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["behavior_id", "name", "skills"],
+  "properties": {
+    "behavior_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Behavior id wired to a skill-master NPC."
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "min_level": { "type": "integer", "minimum": 0 },
+    "max_level": { "type": "integer", "minimum": 0 },
+    "class_requirement": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Required class id; 0 = any."
+    },
+    "skills": {
+      "type": "array",
+      "description": "Spells this master can teach.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "price"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1, "description": "Spell id (references spells/*.json)." },
+          "level_requirement": { "type": "integer", "minimum": 0 },
+          "class_requirement": { "type": "integer", "minimum": 0 },
+          "price": { "type": "integer", "minimum": 0, "description": "Gold cost to learn the spell." },
+          "skill_requirements": {
+            "type": "array",
+            "description": "Other skill ids required before this one unlocks.",
+            "items": { "type": "integer", "minimum": 0 }
+          },
+          "str_requirement": { "type": "integer", "minimum": 0 },
+          "int_requirement": { "type": "integer", "minimum": 0 },
+          "wis_requirement": { "type": "integer", "minimum": 0 },
+          "agi_requirement": { "type": "integer", "minimum": 0 },
+          "con_requirement": { "type": "integer", "minimum": 0 },
+          "cha_requirement": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

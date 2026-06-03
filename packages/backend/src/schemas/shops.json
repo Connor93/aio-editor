@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/shops.json",
+  "title": "Shop",
+  "description": "REOSERV data/pub/shops/<id>.json — one ShopRecord per file. See src/utils/load_shop_file.rs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["behavior_id", "name", "trades", "crafts"],
+  "properties": {
+    "behavior_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Behavior id wired to a shopkeeper NPC."
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "min_level": { "type": "integer", "minimum": 0 },
+    "max_level": { "type": "integer", "minimum": 0 },
+    "class_requirement": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Required class id; 0 = any."
+    },
+    "trades": {
+      "type": "array",
+      "description": "Items the shop buys / sells.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item_id"],
+        "properties": {
+          "item_id": { "type": "integer", "minimum": 1 },
+          "buy_price": { "type": "integer", "minimum": 0, "description": "Gold the shop pays to buy from the player. 0 = won't buy." },
+          "sell_price": { "type": "integer", "minimum": 0, "description": "Gold the shop charges to sell to the player. 0 = not for sale." },
+          "max_amount": { "type": "integer", "minimum": 0, "description": "Stack limit per transaction." }
+        }
+      }
+    },
+    "crafts": {
+      "type": "array",
+      "description": "Craft recipes available at the shop. Empty = no crafting.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["itemId", "ingredients"],
+        "properties": {
+          "itemId": { "type": "integer", "minimum": 1, "description": "Resulting crafted item id." },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["item_id", "amount"],
+              "properties": {
+                "item_id": { "type": "integer", "minimum": 1 },
+                "amount": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

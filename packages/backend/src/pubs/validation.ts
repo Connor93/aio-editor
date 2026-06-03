@@ -1,15 +1,31 @@
 import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 
+import classesSchema from "../schemas/classes.json" with { type: "json" };
+import innsSchema from "../schemas/inns.json" with { type: "json" };
+import itemsSchema from "../schemas/items.json" with { type: "json" };
+import mapModulesSchema from "../schemas/map_modules.json" with { type: "json" };
+import npcsSchema from "../schemas/npcs.json" with { type: "json" };
 import reputationTiersSchema from "../schemas/reputation_tiers.json" with { type: "json" };
+import shopsSchema from "../schemas/shops.json" with { type: "json" };
+import skillMastersSchema from "../schemas/skill_masters.json" with { type: "json" };
+import spellsSchema from "../schemas/spells.json" with { type: "json" };
 import zonesSchema from "../schemas/zones.json" with { type: "json" };
 
 // Single source of truth — `validators` is derived from `rawSchemas` so a
 // new entry only ever needs to be added in one place. Drop the JSON into
 // ../schemas/, add the import, and add the key here.
 const rawSchemas: Record<string, object> = {
-  zones: zonesSchema,
+  classes: classesSchema,
+  inns: innsSchema,
+  items: itemsSchema,
+  map_modules: mapModulesSchema,
+  npcs: npcsSchema,
   reputation_tiers: reputationTiersSchema,
+  shops: shopsSchema,
+  skill_masters: skillMastersSchema,
+  spells: spellsSchema,
+  zones: zonesSchema,
 };
 
 export interface ValidationIssue {

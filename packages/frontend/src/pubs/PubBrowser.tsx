@@ -133,10 +133,26 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
       await savePubFile(selection.type, selection.filename, draft, token);
       setStatusMessage("saved to staging");
       setFileContent({ ...fileContent, content: draft, source: "staging", staged: true });
+      // Refresh the sidebar entry too — saved name may have changed, and we
+      // don't want the list to keep showing the old display name until the
+      // user navigates away and back.
+      const savedName = (() => {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed && typeof parsed === "object" && typeof parsed.name === "string") {
+            return parsed.name;
+          }
+        } catch {
+          // unreadable JSON shouldn't reach here (server accepted the save)
+        }
+        return undefined;
+      })();
       if (files) {
         setFiles(
           files.map((f) =>
-            f.filename === selection.filename ? { ...f, staged: true } : f
+            f.filename === selection.filename
+              ? { ...f, staged: true, ...(savedName !== undefined ? { name: savedName } : {}) }
+              : f
           )
         );
       }
@@ -188,17 +204,22 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
             {files.map((f) => (
               <li key={f.filename}>
                 <button
-                  className={`w-full text-left rounded px-2 py-1 text-sm font-mono hover:bg-slate-800 ${
+                  className={`w-full text-left rounded px-2 py-1 text-sm hover:bg-slate-800 ${
                     selection?.filename === f.filename ? "bg-slate-800 text-white" : "text-slate-300"
                   }`}
                   onClick={() =>
                     setSelection({ type: selectedType, filename: f.filename })
                   }
                 >
-                  <span className="truncate block">{f.filename}</span>
-                  {f.staged && (
-                    <span className="text-[10px] uppercase text-amber-400">staged</span>
-                  )}
+                  <span className="truncate block">
+                    {f.name ?? <span className="italic text-slate-500">(unnamed)</span>}
+                  </span>
+                  <span className="block font-mono text-[10px] text-slate-500">
+                    {f.filename}
+                    {f.staged && (
+                      <span className="ml-2 uppercase text-amber-400">staged</span>
+                    )}
+                  </span>
                 </button>
               </li>
             ))}

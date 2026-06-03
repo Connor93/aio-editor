@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/items.json",
+  "title": "Item",
+  "description": "REOSERV data/pub/items/<id>.json — one EifRecord per file. See src/utils/load_item_file.rs. type/subtype/special/element/size are enum integers; see eolib::protocol::pub.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "graphic_id": { "type": "integer", "minimum": 0 },
+    "type": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 29,
+      "description": "ItemType: 0=General,2=Currency,3=Heal,4=Teleport,6=ExpReward,9=Key,10=Weapon,11=Shield,12=Armor,13=Hat,14=Boots,15=Gloves,16=Accessory,17=Belt,18=Necklace,19=Ring,20=Armlet,21=Bracer,22=Alcohol,23=EffectPotion,24=HairDye,25=CureCurse."
+    },
+    "subtype": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "ItemSubtype enum (eolib)."
+    },
+    "special": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "ItemSpecial enum (eolib)."
+    },
+    "hp": { "type": "integer" },
+    "tp": { "type": "integer" },
+    "min_damage": { "type": "integer", "minimum": 0 },
+    "max_damage": { "type": "integer", "minimum": 0 },
+    "accuracy": { "type": "integer" },
+    "evade": { "type": "integer" },
+    "armor": { "type": "integer" },
+    "return_damage": { "type": "integer" },
+    "str": { "type": "integer" },
+    "intl": { "type": "integer" },
+    "wis": { "type": "integer" },
+    "agi": { "type": "integer" },
+    "con": { "type": "integer" },
+    "cha": { "type": "integer" },
+    "light_resistance": { "type": "integer" },
+    "dark_resistance": { "type": "integer" },
+    "earth_resistance": { "type": "integer" },
+    "air_resistance": { "type": "integer" },
+    "water_resistance": { "type": "integer" },
+    "fire_resistance": { "type": "integer" },
+    "spec1": {
+      "type": "integer",
+      "description": "Type-dependent: ammo type for weapons, slot for armor, healing amount for consumables, etc."
+    },
+    "spec2": { "type": "integer", "description": "Type-dependent (see spec1)." },
+    "spec3": { "type": "integer", "description": "Type-dependent (see spec1)." },
+    "level_requirement": { "type": "integer", "minimum": 0 },
+    "class_requirement": { "type": "integer", "minimum": 0 },
+    "str_requirement": { "type": "integer", "minimum": 0 },
+    "int_requirement": { "type": "integer", "minimum": 0 },
+    "wis_requirement": { "type": "integer", "minimum": 0 },
+    "agi_requirement": { "type": "integer", "minimum": 0 },
+    "con_requirement": { "type": "integer", "minimum": 0 },
+    "cha_requirement": { "type": "integer", "minimum": 0 },
+    "element": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Element enum (eolib): 0=None,1=Light,2=Dark,3=Earth,4=Air,5=Water,6=Fire."
+    },
+    "element_damage": { "type": "integer", "minimum": 0 },
+    "weight": { "type": "integer", "minimum": 0 },
+    "size": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "ItemSize: 0=Size1x1,1=Size1x2,2=Size1x3,3=Size1x4,4=Size2x1,5=Size2x2,6=Size2x3,7=Size2x4."
+    }
+  }
+}
