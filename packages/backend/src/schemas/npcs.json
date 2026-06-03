@@ -132,7 +132,8 @@
           "rate": {
             "type": "integer",
             "minimum": 0,
-            "description": "Drop rate; integer share, NOT a percentage. See GlobalDrops.ron for the divisor."
+            "maximum": 64000,
+            "description": "Drop chance, rolled against 0..=64000. 64000 ≈ 100%, 6400 ≈ 10%, 640 ≈ 1%, 64 ≈ 0.1%."
           }
         }
       }

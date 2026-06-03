@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useRefs } from "../refs/RefsContext";
 import { type JsonSchema, makeDefault, resolveRef } from "./schema";
@@ -682,23 +682,46 @@ function NumberField({ schema, value, onChange, path, label, required, compact }
   const tooLow = typeof schema.minimum === "number" && n < schema.minimum;
   const tooHigh = typeof schema.maximum === "number" && n > schema.maximum;
   const out = tooLow || tooHigh;
+  const isInteger = schema.type === "integer";
+
+  // Hold a local string so the user can type intermediate states like
+  // "0.", "1e", or "-" without each keystroke re-rendering to the
+  // truncated/parsed value (the old "locked to 0" bug). External value
+  // changes (e.g. from the JSON view) re-seed the local string.
+  const [draftStr, setDraftStr] = useState<string>(String(n));
+  const lastEchoed = useRef<number>(n);
+  useEffect(() => {
+    if (n !== lastEchoed.current) {
+      setDraftStr(String(n));
+      lastEchoed.current = n;
+    }
+  }, [n]);
+
+  const onInputChange = (raw: string) => {
+    setDraftStr(raw);
+    if (raw === "" || raw === "-") return; // mid-typing — don't write yet
+    const next = Number(raw);
+    if (!Number.isFinite(next)) return;
+    const committed = isInteger ? Math.trunc(next) : next;
+    lastEchoed.current = committed;
+    onChange(committed);
+  };
+
+  const sharedInputProps = {
+    type: "number" as const,
+    value: draftStr,
+    step: isInteger ? 1 : "any",
+    min: schema.minimum,
+    max: schema.maximum,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => onInputChange(e.target.value),
+  };
 
   if (compact) {
     return (
       <label className="block w-24">
         <FieldLabel label={label} required={required} description={schema.description} path={path} compact />
         <input
-          type="number"
-          value={n}
-          step={schema.type === "integer" ? 1 : "any"}
-          min={schema.minimum}
-          max={schema.maximum}
-          onChange={(e) => {
-            const next = Number(e.target.value);
-            if (Number.isFinite(next)) {
-              onChange(schema.type === "integer" ? Math.trunc(next) : next);
-            }
-          }}
+          {...sharedInputProps}
           className={`${INPUT_BASE} ${out ? INPUT_WARN : INPUT_OK} mt-0.5 w-full tabular-nums`}
         />
       </label>
@@ -709,17 +732,7 @@ function NumberField({ schema, value, onChange, path, label, required, compact }
     <label className="group/field block">
       <FieldLabel label={label} required={required} description={schema.description} path={path} />
       <input
-        type="number"
-        value={n}
-        step={schema.type === "integer" ? 1 : "any"}
-        min={schema.minimum}
-        max={schema.maximum}
-        onChange={(e) => {
-          const next = Number(e.target.value);
-          if (Number.isFinite(next)) {
-            onChange(schema.type === "integer" ? Math.trunc(next) : next);
-          }
-        }}
+        {...sharedInputProps}
         className={`${INPUT_BASE} ${out ? INPUT_WARN : INPUT_OK} w-full tabular-nums`}
       />
     </label>
