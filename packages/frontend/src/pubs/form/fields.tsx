@@ -104,6 +104,18 @@ const INPUT_BASE =
 const INPUT_OK = "border-slate-700";
 const INPUT_WARN = "border-amber-600/70";
 
+/** Strip common suffixes for the very tight inline stat-block layout. Keeps
+ *  the label informative ("LIGHT" / "STR REQ" / "MIN DMG") without overflowing
+ *  a w-24 column. Full name is still available via the title tooltip. */
+function shortenForCompact(label: string): string {
+  return label
+    .replace(/_resistance$/i, "")
+    .replace(/_requirement$/i, "_req")
+    .replace(/_damage$/i, "_dmg")
+    .replace(/_heal$/i, "_heal")
+    .replace(/_grant$/i, "");
+}
+
 function FieldLabel({
   label,
   required,
@@ -118,30 +130,34 @@ function FieldLabel({
   compact?: boolean;
 }) {
   if (!label) return null;
+  const tooltip = description
+    ? `${label}${description ? ` — ${description}` : ""}${path ? `\n${path}` : ""}`
+    : `${label}${path ? `\n${path}` : ""}`;
   if (compact) {
     return (
-      <div className="flex items-baseline gap-1">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          {label}
+      <div
+        className="flex items-baseline gap-1 overflow-hidden"
+        title={tooltip}
+      >
+        <span className="min-w-0 flex-1 truncate text-[10px] font-medium uppercase tracking-wide text-slate-400">
+          {shortenForCompact(label)}
         </span>
-        {required && <span className="text-red-400">*</span>}
+        {required && <span className="shrink-0 text-red-400">*</span>}
       </div>
     );
   }
   return (
     <div className="mb-1 flex items-baseline gap-2">
-      <span className="text-sm font-medium text-slate-200">
+      <span
+        className="text-sm font-medium text-slate-200"
+        title={description ? `${label} — ${description}` : undefined}
+      >
         {label}
         {required && <span className="ml-0.5 text-red-400">*</span>}
       </span>
       <span className="hidden font-mono text-[10px] text-slate-600 group-hover/field:inline">
         {path}
       </span>
-      {description && (
-        <span className="ml-auto truncate text-[11px] text-slate-500" title={description}>
-          {description}
-        </span>
-      )}
     </div>
   );
 }
@@ -194,7 +210,7 @@ function ObjectField({ schema, value, onChange, rootSchema, path, label, require
           const childPath = `${path === "/" ? "" : path}/${key}`;
           const isOptional = !requiredKeys.has(key);
           return (
-            <div key={key} className="relative">
+            <div key={key} className="group/row relative">
               <SchemaField
                 schema={childSchema}
                 value={obj[key]}
@@ -213,10 +229,11 @@ function ObjectField({ schema, value, onChange, rootSchema, path, label, require
                     delete rest[key];
                     onChange(rest);
                   }}
-                  className="absolute right-2 top-2 rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:bg-slate-800"
+                  className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-200 group-hover/row:flex"
                   title={`remove optional ${key}`}
+                  aria-label={`remove ${key}`}
                 >
-                  remove
+                  ×
                 </button>
               )}
             </div>
@@ -330,12 +347,14 @@ function GroupedSection({
 
   return (
     <section>
-      <div className="sticky top-0 z-10 -mx-4 mb-3 flex items-baseline gap-3 border-b border-slate-800 bg-slate-950/95 px-4 py-2 backdrop-blur">
+      <div className="sticky top-0 z-10 -mx-4 mb-3 border-b border-slate-800 bg-slate-950/95 px-4 py-2 backdrop-blur">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
           {group.label}
         </h3>
         {group.description && (
-          <p className="truncate text-[11px] text-slate-500">{group.description}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+            {group.description}
+          </p>
         )}
       </div>
       <div className={containerClass}>
@@ -344,7 +363,7 @@ function GroupedSection({
           const isOptional = !requiredKeys.has(key);
           const showRemove = isOptional && !compactChildren;
           return (
-            <div key={key} className={showRemove ? "relative pr-16" : "relative"}>
+            <div key={key} className="group/row relative">
               <SchemaField
                 schema={childSchema}
                 value={obj[key]}
@@ -363,10 +382,11 @@ function GroupedSection({
                     delete rest[key];
                     onChange(rest);
                   }}
-                  className="absolute right-2 top-2 rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:bg-slate-800"
+                  className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-200 group-hover/row:flex"
                   title={`remove optional ${key}`}
+                  aria-label={`remove ${key}`}
                 >
-                  remove
+                  ×
                 </button>
               )}
             </div>
@@ -545,7 +565,7 @@ function NumberField({ schema, value, onChange, path, label, required, compact }
 
   if (compact) {
     return (
-      <label className="block w-20">
+      <label className="block w-24">
         <FieldLabel label={label} required={required} description={schema.description} path={path} compact />
         <input
           type="number"
