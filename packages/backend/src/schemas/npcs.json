@@ -6,6 +6,43 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["name"],
+  "x-aio-groups": [
+    {
+      "label": "Identity",
+      "fields": ["name", "graphic_id", "race", "behavior_id"]
+    },
+    {
+      "label": "Classification",
+      "fields": ["type", "boss", "child"]
+    },
+    {
+      "label": "Combat",
+      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage"]
+    },
+    {
+      "label": "Element",
+      "fields": ["element", "element_damage", "element_weakness", "element_weakness_damage"]
+    },
+    {
+      "label": "Progression",
+      "fields": ["level", "experience"]
+    },
+    {
+      "label": "Rates",
+      "description": "Per-NPC cadence overrides loaded by load_npc_rates_file.rs.",
+      "fields": ["attack_rate_ms", "move_rate_ms", "reputation_grant"]
+    },
+    {
+      "label": "Drops",
+      "description": "Drop table loaded by load_drop_file.rs.",
+      "fields": ["drops"]
+    },
+    {
+      "label": "Talk",
+      "description": "Ambient lines loaded by load_talk_file.rs.",
+      "fields": ["talk_messages", "talk_rate"]
+    }
+  ],
   "properties": {
     "name": { "type": "string", "minLength": 1 },
     "graphic_id": { "type": "integer", "minimum": 0 },

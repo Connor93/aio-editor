@@ -6,6 +6,49 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["name"],
+  "x-aio-groups": [
+    {
+      "label": "Identity",
+      "fields": ["name", "graphic_id"]
+    },
+    {
+      "label": "Type",
+      "description": "Type/subtype/special control how the item behaves; size controls inventory packing.",
+      "fields": ["type", "subtype", "special", "size", "weight"]
+    },
+    {
+      "label": "Combat",
+      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage"]
+    },
+    {
+      "label": "Character Stats",
+      "layout": "inline",
+      "fields": ["str", "intl", "wis", "agi", "con", "cha"]
+    },
+    {
+      "label": "Element",
+      "fields": ["element", "element_damage"]
+    },
+    {
+      "label": "Resistances",
+      "layout": "inline",
+      "fields": ["light_resistance", "dark_resistance", "earth_resistance", "air_resistance", "water_resistance", "fire_resistance"]
+    },
+    {
+      "label": "Type-Specific Specs",
+      "description": "spec1/2/3 have meanings that vary by item type — see the loader.",
+      "fields": ["spec1", "spec2", "spec3"]
+    },
+    {
+      "label": "Requirements",
+      "fields": ["level_requirement", "class_requirement"]
+    },
+    {
+      "label": "Stat Requirements",
+      "layout": "inline",
+      "fields": ["str_requirement", "int_requirement", "wis_requirement", "agi_requirement", "con_requirement", "cha_requirement"]
+    }
+  ],
   "properties": {
     "name": { "type": "string", "minLength": 1 },
     "graphic_id": { "type": "integer", "minimum": 0 },

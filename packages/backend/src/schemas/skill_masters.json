@@ -6,6 +6,20 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["behavior_id", "name", "skills"],
+  "x-aio-groups": [
+    {
+      "label": "Identity",
+      "fields": ["behavior_id", "name"]
+    },
+    {
+      "label": "Restrictions",
+      "fields": ["min_level", "max_level", "class_requirement"]
+    },
+    {
+      "label": "Skills",
+      "fields": ["skills"]
+    }
+  ],
   "properties": {
     "behavior_id": {
       "type": "integer",

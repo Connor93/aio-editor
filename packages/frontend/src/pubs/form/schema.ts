@@ -2,6 +2,17 @@
 // renderer handles the shapes that show up in our shipped pub schemas; new
 // keywords can be added here and dispatched in SchemaField.tsx as needed.
 
+export interface FieldGroup {
+  label: string;
+  description?: string;
+  /** Field keys in display order. Fields not listed in any group fall into a
+   *  trailing "Other" group so nothing silently disappears from the form. */
+  fields: string[];
+  /** Layout hint. "grid" (default) → 2-col responsive grid; "inline" → tight
+   *  horizontal row of small labeled inputs (good for stat blocks). */
+  layout?: "grid" | "inline";
+}
+
 export interface JsonSchema {
   type?: "object" | "array" | "string" | "integer" | "number" | "boolean";
   properties?: Record<string, JsonSchema>;
@@ -16,6 +27,8 @@ export interface JsonSchema {
   minLength?: number;
   description?: string;
   title?: string;
+  /** AIO Editor extension. Ignored by Ajv (we run with strict: false). */
+  "x-aio-groups"?: FieldGroup[];
 }
 
 /**

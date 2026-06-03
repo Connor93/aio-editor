@@ -227,7 +227,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
         )}
       </aside>
 
-      <section className="flex flex-col bg-slate-950/0">
+      <section className="flex min-h-0 flex-col bg-slate-950/0">
         {selection === null ? (
           <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
             pick a file to edit
@@ -282,7 +282,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
               {!fileContent ? (
                 <div className="p-4 text-sm text-slate-400">loading…</div>
               ) : editorMode === "form" && schema ? (

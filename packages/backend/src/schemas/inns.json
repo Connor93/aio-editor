@@ -6,6 +6,28 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["behavior_id", "name", "questions"],
+  "x-aio-groups": [
+    {
+      "label": "Identity",
+      "fields": ["behavior_id", "name"]
+    },
+    {
+      "label": "Spawn",
+      "fields": ["spawn_map", "spawn_x", "spawn_y"]
+    },
+    {
+      "label": "Sleep",
+      "fields": ["sleep_map", "sleep_x", "sleep_y"]
+    },
+    {
+      "label": "Alternate Spawn",
+      "fields": ["alternate_spawn_enabled", "alternate_spawn_map", "alternate_spawn_x", "alternate_spawn_y"]
+    },
+    {
+      "label": "Security Questions",
+      "fields": ["questions"]
+    }
+  ],
   "properties": {
     "behavior_id": {
       "type": "integer",

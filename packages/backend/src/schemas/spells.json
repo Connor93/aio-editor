@@ -6,6 +6,38 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["name"],
+  "x-aio-groups": [
+    {
+      "label": "Identity",
+      "fields": ["name", "chant", "icon_id", "graphic_id"]
+    },
+    {
+      "label": "Cast",
+      "fields": ["tp_cost", "sp_cost", "cast_time"]
+    },
+    {
+      "label": "Behavior",
+      "fields": ["nature", "type", "target_restrict", "target_type", "target_time", "max_skill_level"]
+    },
+    {
+      "label": "Combat",
+      "fields": ["min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage"]
+    },
+    {
+      "label": "Element",
+      "fields": ["element", "element_power"]
+    },
+    {
+      "label": "Heal",
+      "layout": "inline",
+      "fields": ["hp_heal", "tp_heal", "sp_heal"]
+    },
+    {
+      "label": "Stat Buffs",
+      "layout": "inline",
+      "fields": ["str", "intl", "wis", "agi", "con", "cha"]
+    }
+  ],
   "properties": {
     "name": { "type": "string", "minLength": 1 },
     "chant": { "type": "string", "description": "Spoken chant string shown in-game when cast." },
