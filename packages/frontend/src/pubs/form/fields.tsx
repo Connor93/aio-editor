@@ -18,6 +18,11 @@ interface CommonProps {
 export function SchemaField(props: CommonProps) {
   const resolved = resolveRef(props.schema, props.rootSchema);
 
+  // x-aio-options takes precedence over the bare integer/string input.
+  if (resolved["x-aio-options"]) {
+    return <SelectField {...props} schema={resolved} />;
+  }
+
   if (resolved.type === "object") {
     if (resolved.properties) return <ObjectField {...props} schema={resolved} />;
     if (resolved.additionalProperties && resolved.additionalProperties !== true)
@@ -47,6 +52,58 @@ export function SchemaField(props: CommonProps) {
   );
 }
 
+function SelectField({
+  schema,
+  value,
+  onChange,
+  path,
+  label,
+  required,
+  compact,
+}: CommonProps) {
+  const options = schema["x-aio-options"] ?? [];
+  // Find the option whose value matches; null when the file has a value not
+  // in our list (e.g. an Unrecognized variant from a newer REOSERV).
+  const matchedIndex = options.findIndex((o) => o.value === value);
+  const unrecognized = matchedIndex === -1 && value !== undefined && value !== null;
+
+  const handleChange = (rawIndex: string) => {
+    const idx = Number(rawIndex);
+    const picked = options[idx];
+    if (!picked) return;
+    onChange(picked.value);
+  };
+
+  return (
+    <label className={`group/field block ${compact ? "w-32" : ""}`}>
+      <FieldLabel label={label} required={required} description={schema.description} path={path} compact={compact} />
+      <select
+        value={matchedIndex >= 0 ? String(matchedIndex) : ""}
+        onChange={(e) => handleChange(e.target.value)}
+        className={`${INPUT_BASE} ${unrecognized ? INPUT_WARN : INPUT_OK} ${compact ? "mt-0.5 w-full" : "w-full"}`}
+      >
+        {matchedIndex === -1 && (
+          <option value="" disabled>
+            {unrecognized
+              ? `(unrecognized: ${JSON.stringify(value)})`
+              : "(pick a value)"}
+          </option>
+        )}
+        {options.map((opt, i) => (
+          <option key={i} value={String(i)}>
+            {opt.label} {typeof opt.value === "number" ? `(${opt.value})` : ""}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+const INPUT_BASE =
+  "rounded-md border bg-slate-950 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500/40 disabled:opacity-50";
+const INPUT_OK = "border-slate-700";
+const INPUT_WARN = "border-amber-600/70";
+
 function FieldLabel({
   label,
   required,
@@ -64,20 +121,26 @@ function FieldLabel({
   if (compact) {
     return (
       <div className="flex items-baseline gap-1">
-        <span className="text-xs font-medium text-slate-200">{label}</span>
+        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+          {label}
+        </span>
         {required && <span className="text-red-400">*</span>}
       </div>
     );
   }
   return (
-    <div className="mb-1">
-      <span className="text-sm text-slate-200">
+    <div className="mb-1 flex items-baseline gap-2">
+      <span className="text-sm font-medium text-slate-200">
         {label}
-        {required && <span className="ml-1 text-red-400">*</span>}
+        {required && <span className="ml-0.5 text-red-400">*</span>}
       </span>
-      <span className="ml-2 font-mono text-[10px] text-slate-500">{path}</span>
+      <span className="hidden font-mono text-[10px] text-slate-600 group-hover/field:inline">
+        {path}
+      </span>
       {description && (
-        <p className="text-xs text-slate-500">{description}</p>
+        <span className="ml-auto truncate text-[11px] text-slate-500" title={description}>
+          {description}
+        </span>
       )}
     </div>
   );
@@ -267,12 +330,12 @@ function GroupedSection({
 
   return (
     <section>
-      <div className="sticky top-0 z-10 -mx-4 mb-2 border-b border-slate-800 bg-slate-950/90 px-4 py-1.5 backdrop-blur">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+      <div className="sticky top-0 z-10 -mx-4 mb-3 flex items-baseline gap-3 border-b border-slate-800 bg-slate-950/95 px-4 py-2 backdrop-blur">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
           {group.label}
         </h3>
         {group.description && (
-          <p className="text-[11px] text-slate-500">{group.description}</p>
+          <p className="truncate text-[11px] text-slate-500">{group.description}</p>
         )}
       </div>
       <div className={containerClass}>
@@ -462,15 +525,13 @@ function StringField({ schema, value, onChange, path, label, required, compact }
   const tooShort = typeof schema.minLength === "number" && s.length < schema.minLength;
 
   return (
-    <label className="block">
+    <label className="group/field block">
       <FieldLabel label={label} required={required} description={schema.description} path={path} compact={compact} />
       <input
         type="text"
         value={s}
         onChange={(e) => onChange(e.target.value)}
-        className={`${compact ? "mt-0.5 w-full" : "w-full"} rounded-md border bg-slate-950 px-2 py-1 text-sm ${
-          tooShort ? "border-amber-700" : "border-slate-700"
-        }`}
+        className={`${INPUT_BASE} ${tooShort ? INPUT_WARN : INPUT_OK} ${compact ? "mt-0.5 w-full" : "w-full"}`}
       />
     </label>
   );
@@ -498,40 +559,29 @@ function NumberField({ schema, value, onChange, path, label, required, compact }
               onChange(schema.type === "integer" ? Math.trunc(next) : next);
             }
           }}
-          className={`mt-0.5 w-full rounded-md border bg-slate-950 px-2 py-1 text-sm tabular-nums ${
-            out ? "border-amber-700" : "border-slate-700"
-          }`}
+          className={`${INPUT_BASE} ${out ? INPUT_WARN : INPUT_OK} mt-0.5 w-full tabular-nums`}
         />
       </label>
     );
   }
 
   return (
-    <label className="block">
+    <label className="group/field block">
       <FieldLabel label={label} required={required} description={schema.description} path={path} />
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={n}
-          step={schema.type === "integer" ? 1 : "any"}
-          min={schema.minimum}
-          max={schema.maximum}
-          onChange={(e) => {
-            const next = Number(e.target.value);
-            if (Number.isFinite(next)) {
-              onChange(schema.type === "integer" ? Math.trunc(next) : next);
-            }
-          }}
-          className={`w-32 rounded-md border bg-slate-950 px-2 py-1 text-sm tabular-nums ${
-            out ? "border-amber-700" : "border-slate-700"
-          }`}
-        />
-        {typeof schema.minimum === "number" || typeof schema.maximum === "number" ? (
-          <span className="text-[10px] text-slate-500">
-            [{schema.minimum ?? "−∞"}, {schema.maximum ?? "∞"}]
-          </span>
-        ) : null}
-      </div>
+      <input
+        type="number"
+        value={n}
+        step={schema.type === "integer" ? 1 : "any"}
+        min={schema.minimum}
+        max={schema.maximum}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          if (Number.isFinite(next)) {
+            onChange(schema.type === "integer" ? Math.trunc(next) : next);
+          }
+        }}
+        className={`${INPUT_BASE} ${out ? INPUT_WARN : INPUT_OK} w-full tabular-nums`}
+      />
     </label>
   );
 }

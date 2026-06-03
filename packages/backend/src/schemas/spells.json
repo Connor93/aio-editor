@@ -49,28 +49,56 @@
     "nature": {
       "type": "integer",
       "minimum": 0,
-      "description": "SkillNature enum (eolib): damage/heal/cure/stat-buff/etc."
+      "description": "SkillNature enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "Spell" },
+        { "value": 1, "label": "Skill" }
+      ]
     },
     "type": {
       "type": "integer",
       "minimum": 0,
-      "description": "SkillType enum (eolib)."
+      "description": "SkillType enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "Heal" },
+        { "value": 1, "label": "Attack" },
+        { "value": 2, "label": "Bard" }
+      ]
     },
     "element": {
       "type": "integer",
       "minimum": 0,
-      "description": "Element enum (eolib): 0=None,1=Light,2=Dark,3=Earth,4=Air,5=Water,6=Fire."
+      "description": "Element enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "None" },
+        { "value": 1, "label": "Light" },
+        { "value": 2, "label": "Dark" },
+        { "value": 3, "label": "Earth" },
+        { "value": 4, "label": "Wind" },
+        { "value": 5, "label": "Water" },
+        { "value": 6, "label": "Fire" }
+      ]
     },
     "element_power": { "type": "integer", "minimum": 0 },
     "target_restrict": {
       "type": "integer",
       "minimum": 0,
-      "description": "SkillTargetRestrict enum: 0=NPCOnly,1=Friendly,2=Opponent."
+      "description": "SkillTargetRestrict enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "NPC only" },
+        { "value": 1, "label": "Friendly" },
+        { "value": 2, "label": "Opponent" }
+      ]
     },
     "target_type": {
       "type": "integer",
       "minimum": 0,
-      "description": "SkillTargetType enum: 0=Normal,1=Self,2=Group,3=Area."
+      "description": "SkillTargetType enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "Normal" },
+        { "value": 1, "label": "Self" },
+        { "value": 3, "label": "Group" }
+      ]
     },
     "target_time": { "type": "integer", "minimum": 0 },
     "max_skill_level": { "type": "integer", "minimum": 0 },

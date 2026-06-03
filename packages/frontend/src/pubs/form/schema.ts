@@ -29,6 +29,11 @@ export interface JsonSchema {
   title?: string;
   /** AIO Editor extension. Ignored by Ajv (we run with strict: false). */
   "x-aio-groups"?: FieldGroup[];
+  /** AIO Editor extension. Renders the field as a labelled select dropdown
+   *  instead of a bare input. Free-form values are still accepted on save —
+   *  Ajv only sees `type`/`minimum`/etc. — so forward-compat with new
+   *  REOSERV enum variants is preserved. */
+  "x-aio-options"?: Array<{ value: string | number; label: string }>;
 }
 
 /**

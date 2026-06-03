@@ -20,9 +20,10 @@ async function main() {
 
   await registerAuthRoutes(app);
 
-  // Bearer-token guard for everything under /api/pubs/*; /api/health and
+  // Bearer-token guard for /api/pubs/* and /api/schemas/*; /api/health and
   // /api/auth stay public so login + liveness checks don't require a token.
   registerAuthGuard(app, "/api/pubs");
+  registerAuthGuard(app, "/api/schemas");
   await registerPubRoutes(app);
 
   try {

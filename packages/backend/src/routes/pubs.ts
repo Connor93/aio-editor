@@ -30,6 +30,17 @@ export async function registerPubRoutes(app: FastifyInstance) {
   });
 
   app.get<{ Params: { type: string } }>(
+    "/api/schemas/:type",
+    async (request, reply) => {
+      const schema = getSchemaFor(request.params.type);
+      if (!schema) {
+        return reply.code(404).send({ error: "no schema registered for type" });
+      }
+      return schema;
+    }
+  );
+
+  app.get<{ Params: { type: string } }>(
     "/api/pubs/:type",
     async (request, reply) => {
       try {

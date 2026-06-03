@@ -55,8 +55,31 @@
     "type": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 29,
-      "description": "ItemType: 0=General,2=Currency,3=Heal,4=Teleport,6=ExpReward,9=Key,10=Weapon,11=Shield,12=Armor,13=Hat,14=Boots,15=Gloves,16=Accessory,17=Belt,18=Necklace,19=Ring,20=Armlet,21=Bracer,22=Alcohol,23=EffectPotion,24=HairDye,25=CureCurse."
+      "description": "ItemType enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "General" },
+        { "value": 2, "label": "Currency" },
+        { "value": 3, "label": "Heal" },
+        { "value": 4, "label": "Teleport" },
+        { "value": 6, "label": "ExpReward" },
+        { "value": 9, "label": "Key" },
+        { "value": 10, "label": "Weapon" },
+        { "value": 11, "label": "Shield" },
+        { "value": 12, "label": "Armor" },
+        { "value": 13, "label": "Hat" },
+        { "value": 14, "label": "Boots" },
+        { "value": 15, "label": "Gloves" },
+        { "value": 16, "label": "Accessory" },
+        { "value": 17, "label": "Belt" },
+        { "value": 18, "label": "Necklace" },
+        { "value": 19, "label": "Ring" },
+        { "value": 20, "label": "Armlet" },
+        { "value": 21, "label": "Bracer" },
+        { "value": 22, "label": "Alcohol" },
+        { "value": 23, "label": "EffectPotion" },
+        { "value": 24, "label": "HairDye" },
+        { "value": 25, "label": "CureCurse" }
+      ]
     },
     "subtype": {
       "type": "integer",
@@ -105,14 +128,33 @@
     "element": {
       "type": "integer",
       "minimum": 0,
-      "description": "Element enum (eolib): 0=None,1=Light,2=Dark,3=Earth,4=Air,5=Water,6=Fire."
+      "description": "Element enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "None" },
+        { "value": 1, "label": "Light" },
+        { "value": 2, "label": "Dark" },
+        { "value": 3, "label": "Earth" },
+        { "value": 4, "label": "Wind" },
+        { "value": 5, "label": "Water" },
+        { "value": 6, "label": "Fire" }
+      ]
     },
     "element_damage": { "type": "integer", "minimum": 0 },
     "weight": { "type": "integer", "minimum": 0 },
     "size": {
       "type": "integer",
       "minimum": 0,
-      "description": "ItemSize: 0=Size1x1,1=Size1x2,2=Size1x3,3=Size1x4,4=Size2x1,5=Size2x2,6=Size2x3,7=Size2x4."
+      "description": "ItemSize enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "1x1" },
+        { "value": 1, "label": "1x2" },
+        { "value": 2, "label": "1x3" },
+        { "value": 3, "label": "1x4" },
+        { "value": 4, "label": "2x1" },
+        { "value": 5, "label": "2x2" },
+        { "value": 6, "label": "2x3" },
+        { "value": 7, "label": "2x4" }
+      ]
     }
   }
 }

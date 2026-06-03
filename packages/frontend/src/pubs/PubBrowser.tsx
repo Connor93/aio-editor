@@ -7,10 +7,11 @@ import {
   fetchPubFile,
   fetchPubFiles,
   fetchPubTypes,
+  fetchSchema,
   savePubFile,
 } from "./api";
 import { SchemaForm } from "./form/SchemaForm";
-import type { JsonSchema } from "./form/schema";
+import { type JsonSchema, makeDefault } from "./form/schema";
 import type {
   PubFile,
   PubFileContent,
@@ -123,6 +124,62 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
 
   const dirty = fileContent !== null && draft !== fileContent.content;
 
+  const selectedTypeMeta = selectedType
+    ? types?.find((t) => t.type === selectedType) ?? null
+    : null;
+  const canCreateNew =
+    selectedTypeMeta?.kind === "directory" && selectedTypeMeta.hasSchema === true;
+  const [creating, setCreating] = useState(false);
+
+  function nextAvailableId(existing: PubFile[]): string {
+    // REOSERV's directory pubs use 4-digit zero-padded ids today. Derive
+    // width from the next id itself so a stray 5-digit import doesn't bump
+    // every subsequent new file out of the convention.
+    let max = 0;
+    for (const f of existing) {
+      const m = /^(\d+)\.json$/.exec(f.filename);
+      if (!m) continue;
+      const id = Number(m[1]);
+      if (id > max) max = id;
+    }
+    const next = max + 1;
+    const width = Math.max(4, String(next).length);
+    return `${String(next).padStart(width, "0")}.json`;
+  }
+
+  async function onCreateNew() {
+    if (!selectedType || !canCreateNew || !files) return;
+    // Capture state at the start so a mid-flight selectedType change can't
+    // inject a new file into the wrong type's list. Cheaper than threading
+    // an AbortController through fetchSchema for this one off-the-hot-path
+    // action.
+    const requestedType = selectedType;
+    const filesAtStart = files;
+    setCreating(true);
+    setError(null);
+    setStatusMessage(null);
+    setValidationErrors([]);
+    try {
+      const schema = await fetchSchema(requestedType, token);
+      const skeleton = makeDefault(schema, schema);
+      const filename = nextAvailableId(filesAtStart);
+      const body = JSON.stringify(skeleton, null, 2);
+      await savePubFile(requestedType, filename, body, token);
+      if (selectedType !== requestedType) {
+        // The user moved on while the create was in flight — don't smear
+        // sidebar/selection state onto a different type.
+        return;
+      }
+      setFiles([...filesAtStart, { filename, staged: true, name: null }]);
+      setSelection({ type: requestedType, filename });
+      setStatusMessage(`created ${filename} in staging`);
+    } catch (err) {
+      handleApiError(err, "failed to create new file");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   async function onSave() {
     if (!selection || !fileContent) return;
     setSaving(true);
@@ -164,67 +221,105 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
   }
 
   return (
-    <div className="grid h-full grid-cols-[14rem_18rem_1fr] gap-0 border-t border-slate-800">
-      <aside className="border-r border-slate-800 bg-slate-950/40 p-2 overflow-auto">
-        <h2 className="text-xs uppercase text-slate-500 px-2 py-1">Pub types</h2>
-        {types === null ? (
-          <p className="px-2 py-1 text-sm text-slate-400">loading…</p>
-        ) : (
-          <ul>
-            {types.map((t) => (
-              <li key={t.type}>
-                <button
-                  className={`w-full text-left rounded px-2 py-1 text-sm hover:bg-slate-800 ${
-                    selectedType === t.type ? "bg-slate-800 text-white" : "text-slate-300"
-                  }`}
-                  onClick={() => {
-                    setSelectedType(t.type);
-                    setSelection(null);
-                  }}
-                >
-                  {t.type}
-                  <span className="ml-2 text-[10px] uppercase text-slate-500">{t.kind === "directory" ? "dir" : "file"}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+    <div className="grid h-full grid-cols-[14rem_20rem_1fr] gap-0 border-t border-slate-800">
+      <aside className="flex min-h-0 flex-col border-r border-slate-800 bg-slate-950/40">
+        <div className="border-b border-slate-800/60 px-3 py-2">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Pub types
+          </h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+          {types === null ? (
+            <p className="px-2 py-1 text-sm text-slate-500">loading…</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {types.map((t) => (
+                <li key={t.type}>
+                  <button
+                    className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm transition-colors ${
+                      selectedType === t.type
+                        ? "bg-slate-800 text-white"
+                        : "text-slate-300 hover:bg-slate-800/60"
+                    }`}
+                    onClick={() => {
+                      setSelectedType(t.type);
+                      setSelection(null);
+                    }}
+                  >
+                    <span>{t.type}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                      {t.kind === "directory" ? "dir" : "file"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </aside>
 
-      <aside className="border-r border-slate-800 bg-slate-950/20 p-2 overflow-auto">
-        <h2 className="text-xs uppercase text-slate-500 px-2 py-1">Files</h2>
-        {selectedType === null ? (
-          <p className="px-2 py-1 text-sm text-slate-400">pick a pub type</p>
-        ) : files === null ? (
-          <p className="px-2 py-1 text-sm text-slate-400">loading…</p>
-        ) : files.length === 0 ? (
-          <p className="px-2 py-1 text-sm text-slate-400">no files</p>
-        ) : (
-          <ul>
-            {files.map((f) => (
-              <li key={f.filename}>
-                <button
-                  className={`w-full text-left rounded px-2 py-1 text-sm hover:bg-slate-800 ${
-                    selection?.filename === f.filename ? "bg-slate-800 text-white" : "text-slate-300"
-                  }`}
-                  onClick={() =>
-                    setSelection({ type: selectedType, filename: f.filename })
-                  }
-                >
-                  <span className="truncate block">
-                    {f.name ?? <span className="italic text-slate-500">(unnamed)</span>}
-                  </span>
-                  <span className="block font-mono text-[10px] text-slate-500">
-                    {f.filename}
-                    {f.staged && (
-                      <span className="ml-2 uppercase text-amber-400">staged</span>
-                    )}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+      <aside className="flex min-h-0 flex-col border-r border-slate-800 bg-slate-950/20">
+        <div className="flex items-center justify-between border-b border-slate-800/60 px-3 py-2">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Files {files && `(${files.length})`}
+          </h2>
+          {canCreateNew && (
+            <button
+              onClick={onCreateNew}
+              disabled={creating}
+              className="rounded-md border border-slate-700 px-2 py-0.5 text-[11px] text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              title={`Create a new ${selectedType} entry`}
+            >
+              {creating ? "…" : "+ new"}
+            </button>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+          {selectedType === null ? (
+            <p className="px-2 py-1 text-sm text-slate-500">pick a pub type</p>
+          ) : files === null ? (
+            <p className="px-2 py-1 text-sm text-slate-500">loading…</p>
+          ) : files.length === 0 ? (
+            <p className="px-2 py-1 text-sm text-slate-500">no files</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {files.map((f) => {
+                const selected = selection?.filename === f.filename;
+                return (
+                  <li key={f.filename}>
+                    <button
+                      className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors ${
+                        selected
+                          ? "bg-slate-800 text-white"
+                          : "text-slate-300 hover:bg-slate-800/60"
+                      }`}
+                      onClick={() =>
+                        setSelection({ type: selectedType, filename: f.filename })
+                      }
+                    >
+                      {f.staged ? (
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"
+                          title="staged"
+                        />
+                      ) : (
+                        <span className="h-1.5 w-1.5 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">
+                        {f.name ?? (
+                          <span className="italic text-slate-500">(unnamed)</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                        {f.filename.replace(/\.json$/, "")}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </aside>
 
       <section className="flex min-h-0 flex-col bg-slate-950/0">
@@ -234,49 +329,55 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2 text-sm">
-              <div className="font-mono text-slate-300">
-                {selection.type}/{selection.filename}
+            <div className="flex items-center justify-between gap-4 border-b border-slate-800 bg-slate-950/40 px-4 py-2 text-sm">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-mono text-slate-200">
+                  {selection.type}/{selection.filename}
+                </span>
                 {fileContent?.staged && (
-                  <span className="ml-2 text-[10px] uppercase text-amber-400">
-                    {fileContent.source === "staging" ? "from staging" : "live"}
+                  <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-400">
+                    staged
                   </span>
                 )}
                 {dirty && (
-                  <span className="ml-2 text-[10px] uppercase text-blue-400">
+                  <span className="shrink-0 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-blue-300">
                     unsaved
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex shrink-0 items-center gap-3">
                 {schema && (
                   <div className="flex overflow-hidden rounded-md border border-slate-700 text-xs">
                     <button
                       onClick={() => setEditorMode("form")}
-                      className={`px-3 py-1 ${
-                        editorMode === "form" ? "bg-slate-100 text-slate-900" : "text-slate-300 hover:bg-slate-800"
+                      className={`px-3 py-1 transition-colors ${
+                        editorMode === "form"
+                          ? "bg-slate-100 text-slate-900"
+                          : "text-slate-300 hover:bg-slate-800"
                       }`}
                     >
                       Form
                     </button>
                     <button
                       onClick={() => setEditorMode("json")}
-                      className={`px-3 py-1 ${
-                        editorMode === "json" ? "bg-slate-100 text-slate-900" : "text-slate-300 hover:bg-slate-800"
+                      className={`px-3 py-1 transition-colors ${
+                        editorMode === "json"
+                          ? "bg-slate-100 text-slate-900"
+                          : "text-slate-300 hover:bg-slate-800"
                       }`}
                     >
                       JSON
                     </button>
                   </div>
                 )}
-                {error && <span className="text-xs text-red-400">{error}</span>}
                 {statusMessage && (
                   <span className="text-xs text-emerald-400">{statusMessage}</span>
                 )}
+                {error && <span className="text-xs text-red-400">{error}</span>}
                 <button
                   onClick={onSave}
                   disabled={!dirty || saving}
-                  className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save to staging"}
                 </button>

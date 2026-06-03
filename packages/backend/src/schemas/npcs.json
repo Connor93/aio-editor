@@ -52,7 +52,21 @@
     "type": {
       "type": "integer",
       "minimum": 0,
-      "description": "NpcType enum (eolib): 0=Friendly,1=Passive,2=Aggressive,3=Boss,etc."
+      "description": "NpcType enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "Friendly" },
+        { "value": 1, "label": "Passive" },
+        { "value": 2, "label": "Aggressive" },
+        { "value": 6, "label": "Shop" },
+        { "value": 7, "label": "Inn" },
+        { "value": 9, "label": "Bank" },
+        { "value": 10, "label": "Barber" },
+        { "value": 11, "label": "Guild" },
+        { "value": 12, "label": "Priest" },
+        { "value": 13, "label": "Lawyer" },
+        { "value": 14, "label": "Trainer" },
+        { "value": 15, "label": "Quest" }
+      ]
     },
     "behavior_id": {
       "type": "integer",
@@ -70,10 +84,32 @@
     "element": {
       "type": "integer",
       "minimum": 0,
-      "description": "Element enum (eolib)."
+      "description": "Element enum (eolib).",
+      "x-aio-options": [
+        { "value": 0, "label": "None" },
+        { "value": 1, "label": "Light" },
+        { "value": 2, "label": "Dark" },
+        { "value": 3, "label": "Earth" },
+        { "value": 4, "label": "Wind" },
+        { "value": 5, "label": "Water" },
+        { "value": 6, "label": "Fire" }
+      ]
     },
     "element_damage": { "type": "integer", "minimum": 0 },
-    "element_weakness": { "type": "integer", "minimum": 0 },
+    "element_weakness": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Element this NPC is weak to.",
+      "x-aio-options": [
+        { "value": 0, "label": "None" },
+        { "value": 1, "label": "Light" },
+        { "value": 2, "label": "Dark" },
+        { "value": 3, "label": "Earth" },
+        { "value": 4, "label": "Wind" },
+        { "value": 5, "label": "Water" },
+        { "value": 6, "label": "Fire" }
+      ]
+    },
     "element_weakness_damage": { "type": "integer", "minimum": 0 },
     "level": { "type": "integer", "minimum": 0 },
     "experience": { "type": "integer", "minimum": 0 },

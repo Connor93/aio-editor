@@ -1,4 +1,5 @@
 import { authedFetch } from "../api/client";
+import type { JsonSchema } from "./form/schema";
 import type { PubFile, PubFileContent, PubType } from "./types";
 
 export async function fetchPubTypes(
@@ -50,5 +51,17 @@ export async function savePubFile(
     method: "PUT",
     body: { content },
     token,
+  });
+}
+
+export async function fetchSchema(
+  type: string,
+  token: string,
+  signal?: AbortSignal
+): Promise<JsonSchema> {
+  return authedFetch<JsonSchema>({
+    path: `/api/schemas/${encodeURIComponent(type)}`,
+    token,
+    signal,
   });
 }
