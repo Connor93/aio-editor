@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 
 import { config } from "../config.js";
+import { type ValidationIssue, validatePubContent } from "./validation.js";
 
 export class InvalidPathError extends Error {
   constructor(message: string) {
@@ -15,6 +16,13 @@ export class PubNotFoundError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PubNotFoundError";
+  }
+}
+
+export class SchemaValidationError extends Error {
+  constructor(message: string, readonly issues: ValidationIssue[]) {
+    super(message);
+    this.name = "SchemaValidationError";
   }
 }
 
@@ -178,12 +186,33 @@ export async function writePubFile(
   filename: string,
   content: string
 ): Promise<void> {
-  // Validate JSON parses; refuse the write rather than persisting garbage.
+  // Reject malformed type/filename before doing the JSON parse + schema
+  // validation work, so traversal attempts fail cheaply.
+  assertSafeSegment(type, "type");
+  assertSafeSegment(filename, "filename");
+  if (!filename.endsWith(".json")) {
+    throw new InvalidPathError(`filename must end with .json: ${filename}`);
+  }
+
+  // Step 1: parse JSON. Garbage in == 400; the editor caller saw the same
+  // string the user typed, so syntax errors are user errors not server errors.
+  let parsed: unknown;
   try {
-    JSON.parse(content);
+    parsed = JSON.parse(content);
   } catch (err) {
     throw new InvalidPathError(
       `body is not valid JSON: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  // Step 2: schema validation, if a schema is registered for this pub type.
+  // Types without a registered schema are written through (forward-compat
+  // with un-schema'd pubs while the schema rollout is in progress).
+  const issues = validatePubContent(type, parsed);
+  if (issues && issues.length > 0) {
+    throw new SchemaValidationError(
+      `${type} schema validation failed (${issues.length} issue${issues.length === 1 ? "" : "s"})`,
+      issues
     );
   }
 

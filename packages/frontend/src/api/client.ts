@@ -1,6 +1,7 @@
 export interface ApiError {
   status: number;
   message: string;
+  validationErrors?: Array<{ path: string; message: string }>;
 }
 
 interface AuthedFetchArgs {
@@ -34,13 +35,18 @@ export async function authedFetch<T>({
 
   if (!res.ok) {
     let message = `${method} ${path} failed (${res.status})`;
+    let validationErrors: ApiError["validationErrors"];
     try {
-      const errBody = (await res.json()) as { error?: string };
+      const errBody = (await res.json()) as {
+        error?: string;
+        validationErrors?: ApiError["validationErrors"];
+      };
       if (errBody.error) message = errBody.error;
+      validationErrors = errBody.validationErrors;
     } catch {
       // non-JSON error body — keep generic message
     }
-    throw { status: res.status, message } satisfies ApiError;
+    throw { status: res.status, message, validationErrors } satisfies ApiError;
   }
 
   return (await res.json()) as T;

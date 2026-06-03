@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/reputation_tiers.json",
+  "title": "Reputation tiers",
+  "description": "REOSERV data/pub/reputation_tiers.json — global default thresholds + discounts, with per-zone overrides. See src/utils/load_reputation_tiers_file.rs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["defaults"],
+  "definitions": {
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviled", "unfriendly", "neutral", "friendly", "honored"],
+      "description": "Score thresholds at which each tier is reached. reviled is the minimum (most negative); honored is the maximum (most positive). Must be strictly increasing.",
+      "properties": {
+        "reviled": { "type": "integer" },
+        "unfriendly": { "type": "integer" },
+        "neutral": { "type": "integer" },
+        "friendly": { "type": "integer" },
+        "honored": { "type": "integer" }
+      }
+    },
+    "discounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviled", "unfriendly", "neutral", "friendly", "honored"],
+      "description": "Shop discount percentage per tier. Server clamps to 0..=100; values outside that range are flagged here.",
+      "properties": {
+        "reviled": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "unfriendly": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "neutral": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "friendly": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "honored": { "type": "integer", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "zoneOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Either field may be omitted to inherit the global default for that aspect of the zone.",
+      "properties": {
+        "thresholds": { "$ref": "#/definitions/thresholds" },
+        "discounts": { "$ref": "#/definitions/discounts" }
+      }
+    }
+  },
+  "properties": {
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["thresholds", "discounts"],
+      "properties": {
+        "thresholds": { "$ref": "#/definitions/thresholds" },
+        "discounts": { "$ref": "#/definitions/discounts" }
+      }
+    },
+    "zones": {
+      "type": "object",
+      "description": "Per-zone overrides keyed by stringified zone_id. Must align with entries in zones.json.",
+      "additionalProperties": { "$ref": "#/definitions/zoneOverride" },
+      "propertyNames": {
+        "pattern": "^[0-9]+$"
+      }
+    }
+  }
+}

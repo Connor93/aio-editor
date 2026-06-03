@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/zones.json",
+  "title": "Zones",
+  "description": "REOSERV data/pub/zones.json — zone definitions and per-map assignments. See src/utils/load_zone_file.rs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["zones"],
+  "properties": {
+    "zones": {
+      "type": "array",
+      "description": "Every zone the world knows about. Zone 0 is conventionally the wilderness/default.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["zone_id", "name"],
+        "properties": {
+          "zone_id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unique zone identifier. References map_assignments values + reputation_tiers.json zones keys."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable zone name shown in-game and in admin tools."
+          }
+        }
+      }
+    },
+    "map_assignments": {
+      "type": "object",
+      "description": "Map ID (as a string key) -> zone_id. Maps absent here default to zone 0.",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "propertyNames": {
+        "pattern": "^[0-9]+$"
+      }
+    }
+  }
+}

@@ -3,11 +3,13 @@ import type { FastifyInstance } from "fastify";
 import {
   InvalidPathError,
   PubNotFoundError,
+  SchemaValidationError,
   listPubFiles,
   listPubTypes,
   readPubFile,
   writePubFile,
 } from "../pubs/store.js";
+import { hasSchemaFor } from "../pubs/validation.js";
 
 interface TypeFileParams {
   type: string;
@@ -20,7 +22,10 @@ interface WriteBody {
 
 export async function registerPubRoutes(app: FastifyInstance) {
   app.get("/api/pubs/types", async () => {
-    const types = await listPubTypes();
+    const types = (await listPubTypes()).map((t) => ({
+      ...t,
+      hasSchema: hasSchemaFor(t.type),
+    }));
     return { types };
   });
 
@@ -76,6 +81,11 @@ export async function registerPubRoutes(app: FastifyInstance) {
 }
 
 function mapError(reply: import("fastify").FastifyReply, err: unknown) {
+  if (err instanceof SchemaValidationError) {
+    return reply
+      .code(422)
+      .send({ error: err.message, validationErrors: err.issues });
+  }
   if (err instanceof InvalidPathError) {
     return reply.code(400).send({ error: err.message });
   }

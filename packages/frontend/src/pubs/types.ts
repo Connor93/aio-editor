@@ -1,6 +1,12 @@
 export interface PubType {
   type: string;
   kind: "directory" | "file";
+  hasSchema?: boolean;
+}
+
+export interface ValidationIssue {
+  path: string;
+  message: string;
 }
 
 export interface PubFile {

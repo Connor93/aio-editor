@@ -14,6 +14,7 @@ import type {
   PubFileContent,
   PubSelection,
   PubType,
+  ValidationIssue,
 } from "./types";
 
 interface PubBrowserProps {
@@ -31,6 +32,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
 
   const handleApiError = useCallback(
     (err: unknown, fallback: string): void => {
@@ -40,6 +42,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
         return;
       }
       setError(apiErr?.message ?? fallback);
+      setValidationErrors(apiErr?.validationErrors ?? []);
     },
     [onUnauthorized]
   );
@@ -83,6 +86,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
     const ctrl = new AbortController();
     setError(null);
     setStatusMessage(null);
+    setValidationErrors([]);
     fetchPubFile(selection.type, selection.filename, token, ctrl.signal)
       .then((c) => {
         if (ctrl.signal.aborted) return;
@@ -103,6 +107,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
     setSaving(true);
     setStatusMessage(null);
     setError(null);
+    setValidationErrors([]);
     try {
       await savePubFile(selection.type, selection.filename, draft, token);
       setStatusMessage("saved to staging");
@@ -229,6 +234,21 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                 <div className="p-4 text-sm text-slate-400">loading…</div>
               )}
             </div>
+            {validationErrors.length > 0 && (
+              <div className="border-t border-red-900/50 bg-red-950/30 px-4 py-2">
+                <p className="text-xs uppercase text-red-400 mb-1">
+                  Schema validation errors ({validationErrors.length})
+                </p>
+                <ul className="text-xs text-red-300 space-y-1 max-h-40 overflow-auto">
+                  {validationErrors.map((issue, i) => (
+                    <li key={i} className="font-mono">
+                      <span className="text-red-500">{issue.path}</span>{" "}
+                      <span className="text-red-300">{issue.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         )}
       </section>
