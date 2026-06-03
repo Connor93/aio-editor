@@ -1,0 +1,31 @@
+node_modules/
+dist/
+build/
+.vite/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Prisma generated client (regenerated on install)
+packages/backend/prisma/generated/
+
+# Editor DB (local-only)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

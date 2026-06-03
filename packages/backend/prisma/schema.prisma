@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// File-level locks for concurrent editing. Sprint 3.4 consumer.
+model FileLock {
+  filePath  String   @id @map("file_path")
+  accountId Int      @map("account_id")
+  claimedAt DateTime @default(now()) @map("claimed_at")
+
+  @@map("file_locks")
+}
+
+// Audit log of pushes from staging to live. Sprint 3.4 consumer.
+model AuditEntry {
+  id         Int      @id @default(autoincrement())
+  accountId  Int      @map("account_id")
+  action     String
+  filePaths  String   @map("file_paths") // JSON-encoded array
+  message    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt], map: "audit_entries_created_at_idx")
+  @@map("audit_entries")
+}
