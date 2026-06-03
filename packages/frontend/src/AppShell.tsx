@@ -1,4 +1,5 @@
 import { PubBrowser } from "./pubs/PubBrowser";
+import { RefsProvider } from "./pubs/refs/RefsContext";
 
 interface AppShellProps {
   token: string;
@@ -30,7 +31,9 @@ export function AppShell({ token, expiresAt, onLogout }: AppShellProps) {
       </header>
 
       <main className="flex-1 overflow-hidden">
-        <PubBrowser token={token} onUnauthorized={onLogout} />
+        <RefsProvider token={token} onUnauthorized={onLogout}>
+          <PubBrowser token={token} onUnauthorized={onLogout} />
+        </RefsProvider>
       </main>
     </div>
   );

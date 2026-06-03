@@ -118,7 +118,12 @@
     "spec2": { "type": "integer", "description": "Type-dependent (see spec1)." },
     "spec3": { "type": "integer", "description": "Type-dependent (see spec1)." },
     "level_requirement": { "type": "integer", "minimum": 0 },
-    "class_requirement": { "type": "integer", "minimum": 0 },
+    "class_requirement": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Required class id; 0 = any class.",
+      "x-aio-ref": { "type": "classes", "noneLabel": "(any class)" }
+    },
     "str_requirement": { "type": "integer", "minimum": 0 },
     "int_requirement": { "type": "integer", "minimum": 0 },
     "wis_requirement": { "type": "integer", "minimum": 0 },

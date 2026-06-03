@@ -34,6 +34,20 @@ export interface JsonSchema {
    *  Ajv only sees `type`/`minimum`/etc. — so forward-compat with new
    *  REOSERV enum variants is preserved. */
   "x-aio-options"?: Array<{ value: string | number; label: string }>;
+  /** AIO Editor extension. Declares the field as a cross-pub reference; the
+   *  renderer turns the field into a dropdown sourced from the referenced
+   *  pub's file list. Today only `by: "filename-id"` is supported (the
+   *  field's integer value matches the leading numeric portion of a
+   *  filename like `0001.json`). Validation is advisory only — out-of-list
+   *  values render amber but still save, preserving forward-compat. */
+  "x-aio-ref"?: {
+    type: string;
+    by?: "filename-id";
+    /** Label to show for value 0 when the field treats 0 as a sentinel for
+     *  "none / any". When set, value 0 renders without the unknown-amber
+     *  warning even if no `0000.json` exists. */
+    noneLabel?: string;
+  };
 }
 
 /**

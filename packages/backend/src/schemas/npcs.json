@@ -122,7 +122,11 @@
         "additionalProperties": false,
         "required": ["item_id", "rate"],
         "properties": {
-          "item_id": { "type": "integer", "minimum": 1 },
+          "item_id": {
+            "type": "integer",
+            "minimum": 1,
+            "x-aio-ref": { "type": "items" }
+          },
           "min_amount": { "type": "integer", "minimum": 0 },
           "max_amount": { "type": "integer", "minimum": 0 },
           "rate": {

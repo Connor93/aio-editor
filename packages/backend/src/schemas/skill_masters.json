@@ -32,7 +32,8 @@
     "class_requirement": {
       "type": "integer",
       "minimum": 0,
-      "description": "Required class id; 0 = any."
+      "description": "Required class id; 0 = any.",
+      "x-aio-ref": { "type": "classes", "noneLabel": "(any class)" }
     },
     "skills": {
       "type": "array",
@@ -42,14 +43,27 @@
         "additionalProperties": false,
         "required": ["id", "price"],
         "properties": {
-          "id": { "type": "integer", "minimum": 1, "description": "Spell id (references spells/*.json)." },
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Spell id (references spells/*.json).",
+            "x-aio-ref": { "type": "spells" }
+          },
           "level_requirement": { "type": "integer", "minimum": 0 },
-          "class_requirement": { "type": "integer", "minimum": 0 },
+          "class_requirement": {
+            "type": "integer",
+            "minimum": 0,
+            "x-aio-ref": { "type": "classes", "noneLabel": "(any class)" }
+          },
           "price": { "type": "integer", "minimum": 0, "description": "Gold cost to learn the spell." },
           "skill_requirements": {
             "type": "array",
             "description": "Other skill ids required before this one unlocks.",
-            "items": { "type": "integer", "minimum": 0 }
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "x-aio-ref": { "type": "spells" }
+            }
           },
           "str_requirement": { "type": "integer", "minimum": 0 },
           "int_requirement": { "type": "integer", "minimum": 0 },

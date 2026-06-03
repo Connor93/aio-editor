@@ -36,7 +36,8 @@
     "class_requirement": {
       "type": "integer",
       "minimum": 0,
-      "description": "Required class id; 0 = any."
+      "description": "Required class id; 0 = any.",
+      "x-aio-ref": { "type": "classes", "noneLabel": "(any class)" }
     },
     "trades": {
       "type": "array",
@@ -46,7 +47,11 @@
         "additionalProperties": false,
         "required": ["item_id"],
         "properties": {
-          "item_id": { "type": "integer", "minimum": 1 },
+          "item_id": {
+            "type": "integer",
+            "minimum": 1,
+            "x-aio-ref": { "type": "items" }
+          },
           "buy_price": { "type": "integer", "minimum": 0, "description": "Gold the shop pays to buy from the player. 0 = won't buy." },
           "sell_price": { "type": "integer", "minimum": 0, "description": "Gold the shop charges to sell to the player. 0 = not for sale." },
           "max_amount": { "type": "integer", "minimum": 0, "description": "Stack limit per transaction." }
@@ -61,7 +66,12 @@
         "additionalProperties": false,
         "required": ["itemId", "ingredients"],
         "properties": {
-          "itemId": { "type": "integer", "minimum": 1, "description": "Resulting crafted item id." },
+          "itemId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Resulting crafted item id.",
+            "x-aio-ref": { "type": "items" }
+          },
           "ingredients": {
             "type": "array",
             "items": {
@@ -69,7 +79,11 @@
               "additionalProperties": false,
               "required": ["item_id", "amount"],
               "properties": {
-                "item_id": { "type": "integer", "minimum": 1 },
+                "item_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "x-aio-ref": { "type": "items" }
+                },
                 "amount": { "type": "integer", "minimum": 1 }
               }
             }

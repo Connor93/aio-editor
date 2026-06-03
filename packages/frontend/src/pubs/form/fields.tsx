@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 
+import { useRefs } from "../refs/RefsContext";
 import { type JsonSchema, makeDefault, resolveRef } from "./schema";
+
+/** Parse the leading numeric portion of a filename like "0042.json" → 42.
+ *  Returns null for filenames that don't start with digits. */
+function filenameId(filename: string): number | null {
+  const m = /^(\d+)/.exec(filename);
+  return m ? Number(m[1]) : null;
+}
 
 interface CommonProps {
   schema: JsonSchema;
@@ -21,6 +29,10 @@ export function SchemaField(props: CommonProps) {
   // x-aio-options takes precedence over the bare integer/string input.
   if (resolved["x-aio-options"]) {
     return <SelectField {...props} schema={resolved} />;
+  }
+
+  if (resolved["x-aio-ref"]) {
+    return <ReferenceField {...props} schema={resolved} />;
   }
 
   if (resolved.type === "object") {
@@ -49,6 +61,114 @@ export function SchemaField(props: CommonProps) {
     <div className="text-xs text-amber-400">
       unsupported schema at {props.path}
     </div>
+  );
+}
+
+function ReferenceField({
+  schema,
+  value,
+  onChange,
+  path,
+  label,
+  required,
+  compact,
+}: CommonProps) {
+  const ref = schema["x-aio-ref"]!;
+  const refType = ref.type;
+  const noneLabel = ref.noneLabel;
+  const entry = useRefs(refType);
+
+  const options = useMemo(() => {
+    return entry.files
+      .map((f) => {
+        const id = filenameId(f.filename);
+        if (id === null) return null;
+        return {
+          id,
+          label: f.name ?? "(unnamed)",
+          filename: f.filename,
+        };
+      })
+      .filter((x): x is { id: number; label: string; filename: string } => x !== null)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [entry.files]);
+
+  const currentId = typeof value === "number" ? value : null;
+  const isNoneSentinel = currentId === 0 && noneLabel !== undefined;
+  const matched =
+    currentId !== null && !isNoneSentinel
+      ? options.find((o) => o.id === currentId)
+      : null;
+  const unknown =
+    currentId !== null &&
+    !isNoneSentinel &&
+    entry.status === "loaded" &&
+    !matched;
+  const loading = entry.status === "loading";
+
+  const handleSelect = (raw: string) => {
+    if (raw === "") return; // placeholder selection — keep current value
+    const n = Number(raw);
+    if (Number.isFinite(n)) onChange(n);
+  };
+
+  return (
+    <label className={`group/field block ${compact ? "w-32" : ""}`}>
+      <FieldLabel
+        label={label}
+        required={required}
+        description={schema.description}
+        path={path}
+        compact={compact}
+      />
+      <select
+        value={
+          isNoneSentinel
+            ? "0"
+            : matched
+              ? String(matched.id)
+              : ""
+        }
+        onChange={(e) => handleSelect(e.target.value)}
+        disabled={loading || entry.status === "error"}
+        className={`${INPUT_BASE} ${unknown ? INPUT_WARN : INPUT_OK} ${compact ? "mt-0.5 w-full" : "w-full"} tabular-nums`}
+        title={
+          unknown
+            ? `Value ${currentId} not found in ${refType}/`
+            : isNoneSentinel
+              ? `${noneLabel} → ${refType}/`
+              : `→ ${refType}/`
+        }
+      >
+        {loading && (
+          <option value="" disabled>
+            loading {refType}…
+          </option>
+        )}
+        {entry.status === "error" && (
+          <option value="" disabled>
+            error loading {refType}
+          </option>
+        )}
+        {!matched && !isNoneSentinel && !loading && entry.status !== "error" && (
+          <option value="" disabled>
+            {unknown
+              ? `(unknown: ${currentId}) — pick a ${refType}`
+              : `(pick a ${refType})`}
+          </option>
+        )}
+        {noneLabel !== undefined && (
+          <option value="0">{noneLabel}</option>
+        )}
+        {options
+          .filter((o) => !(noneLabel !== undefined && o.id === 0))
+          .map((o) => (
+            <option key={o.id} value={String(o.id)}>
+              {o.label} ({o.filename.replace(/\.json$/, "")})
+            </option>
+          ))}
+      </select>
+    </label>
   );
 }
 
