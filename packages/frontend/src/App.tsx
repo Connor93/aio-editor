@@ -3,11 +3,11 @@ import { Login } from "./auth/Login";
 import { useAuth } from "./auth/useAuth";
 
 export function App() {
-  const { isAuthenticated, expiresAt, login, logout } = useAuth();
+  const { token, isAuthenticated, expiresAt, login, logout } = useAuth();
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !token) {
     return <Login onLogin={login} />;
   }
 
-  return <AppShell expiresAt={expiresAt} onLogout={logout} />;
+  return <AppShell token={token} expiresAt={expiresAt} onLogout={logout} />;
 }
