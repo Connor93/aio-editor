@@ -20,6 +20,7 @@ export interface PubFileContent {
   source: "live" | "staging";
   staged: boolean;
   content: string;
+  schema?: object | null;
 }
 
 export interface PubSelection {

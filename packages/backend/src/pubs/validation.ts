@@ -4,6 +4,14 @@ import addFormats from "ajv-formats";
 import reputationTiersSchema from "../schemas/reputation_tiers.json" with { type: "json" };
 import zonesSchema from "../schemas/zones.json" with { type: "json" };
 
+// Single source of truth — `validators` is derived from `rawSchemas` so a
+// new entry only ever needs to be added in one place. Drop the JSON into
+// ../schemas/, add the import, and add the key here.
+const rawSchemas: Record<string, object> = {
+  zones: zonesSchema,
+  reputation_tiers: reputationTiersSchema,
+};
+
 export interface ValidationIssue {
   path: string;
   message: string;
@@ -18,17 +26,16 @@ const ajv = new Ajv({
 });
 addFormats(ajv);
 
-// Registry keyed by pub type. The key is the URL segment a client uses (e.g.
-// `/api/pubs/zones/zones.json` -> "zones"). Single-file pubs use the file
-// stem. To add a new schema: drop the JSON file into ../schemas/ and add an
-// import + entry here.
-const validators: Record<string, ValidateFunction> = {
-  zones: ajv.compile(zonesSchema),
-  reputation_tiers: ajv.compile(reputationTiersSchema),
-};
+const validators: Record<string, ValidateFunction> = Object.fromEntries(
+  Object.entries(rawSchemas).map(([type, schema]) => [type, ajv.compile(schema)])
+);
 
 export function hasSchemaFor(type: string): boolean {
   return Object.prototype.hasOwnProperty.call(validators, type);
+}
+
+export function getSchemaFor(type: string): object | null {
+  return rawSchemas[type] ?? null;
 }
 
 export function validatePubContent(

@@ -1,6 +1,6 @@
 import { json } from "@codemirror/lang-json";
 import CodeMirror from "@uiw/react-codemirror";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ApiError } from "../api/client";
 import {
@@ -9,6 +9,8 @@ import {
   fetchPubTypes,
   savePubFile,
 } from "./api";
+import { SchemaForm } from "./form/SchemaForm";
+import type { JsonSchema } from "./form/schema";
 import type {
   PubFile,
   PubFileContent,
@@ -16,6 +18,8 @@ import type {
   PubType,
   ValidationIssue,
 } from "./types";
+
+type EditorMode = "form" | "json";
 
 interface PubBrowserProps {
   token: string;
@@ -33,6 +37,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
+  const [editorMode, setEditorMode] = useState<EditorMode>("form");
 
   const handleApiError = useCallback(
     (err: unknown, fallback: string): void => {
@@ -92,6 +97,9 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
         if (ctrl.signal.aborted) return;
         setFileContent(c);
         setDraft(c.content);
+        // Default to form view when a schema is registered; otherwise fall
+        // back to the raw JSON editor.
+        setEditorMode(c.schema ? "form" : "json");
       })
       .catch((err) => {
         if (ctrl.signal.aborted) return;
@@ -99,6 +107,19 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
       });
     return () => ctrl.abort();
   }, [selection, token, handleApiError]);
+
+  // Parse the current draft into a JS value for form rendering. When parse
+  // fails (user typed invalid JSON in the JSON view, then switched modes)
+  // the form view shows a helpful error rather than crashing.
+  const schema = fileContent?.schema as JsonSchema | null | undefined;
+  const parsedDraft = useMemo<{ value: unknown; error: string | null }>(() => {
+    if (!schema) return { value: null, error: null };
+    try {
+      return { value: JSON.parse(draft), error: null };
+    } catch (e) {
+      return { value: null, error: e instanceof Error ? e.message : String(e) };
+    }
+  }, [draft, schema]);
 
   const dirty = fileContent !== null && draft !== fileContent.content;
 
@@ -207,6 +228,26 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                 )}
               </div>
               <div className="flex items-center gap-3">
+                {schema && (
+                  <div className="flex overflow-hidden rounded-md border border-slate-700 text-xs">
+                    <button
+                      onClick={() => setEditorMode("form")}
+                      className={`px-3 py-1 ${
+                        editorMode === "form" ? "bg-slate-100 text-slate-900" : "text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      Form
+                    </button>
+                    <button
+                      onClick={() => setEditorMode("json")}
+                      className={`px-3 py-1 ${
+                        editorMode === "json" ? "bg-slate-100 text-slate-900" : "text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      JSON
+                    </button>
+                  </div>
+                )}
                 {error && <span className="text-xs text-red-400">{error}</span>}
                 {statusMessage && (
                   <span className="text-xs text-emerald-400">{statusMessage}</span>
@@ -221,7 +262,28 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
               </div>
             </div>
             <div className="flex-1 overflow-auto">
-              {fileContent ? (
+              {!fileContent ? (
+                <div className="p-4 text-sm text-slate-400">loading…</div>
+              ) : editorMode === "form" && schema ? (
+                parsedDraft.error ? (
+                  <div className="m-4 rounded-md border border-amber-900/50 bg-amber-950/30 p-3 text-sm text-amber-300">
+                    Cannot render form — JSON does not parse: {parsedDraft.error}
+                    <div className="mt-2 text-xs text-amber-400">
+                      Switch to JSON view to fix the syntax.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    <SchemaForm
+                      schema={schema}
+                      value={parsedDraft.value}
+                      onChange={(next) =>
+                        setDraft(JSON.stringify(next, null, 2))
+                      }
+                    />
+                  </div>
+                )
+              ) : (
                 <CodeMirror
                   value={draft}
                   height="100%"
@@ -230,8 +292,6 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                   onChange={(value) => setDraft(value)}
                   basicSetup={{ lineNumbers: true, foldGutter: true }}
                 />
-              ) : (
-                <div className="p-4 text-sm text-slate-400">loading…</div>
               )}
             </div>
             {validationErrors.length > 0 && (

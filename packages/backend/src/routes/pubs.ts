@@ -9,7 +9,7 @@ import {
   readPubFile,
   writePubFile,
 } from "../pubs/store.js";
-import { hasSchemaFor } from "../pubs/validation.js";
+import { getSchemaFor, hasSchemaFor } from "../pubs/validation.js";
 
 interface TypeFileParams {
   type: string;
@@ -53,6 +53,7 @@ export async function registerPubRoutes(app: FastifyInstance) {
           source: file.source,
           staged: file.staged,
           content: file.content,
+          schema: getSchemaFor(type),
         };
       } catch (err) {
         return mapError(reply, err);
