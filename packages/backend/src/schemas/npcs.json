@@ -33,6 +33,11 @@
       "fields": ["attack_rate_ms", "move_rate_ms", "reputation_grant"]
     },
     {
+      "label": "Rarity override",
+      "description": "Per-NPC drop-rarity distribution. When set, replaces the global rarity_weights.json for this NPC's drops. Leave absent to use the global. Use for bosses that should skew toward higher rarities.",
+      "fields": ["rarity_override"]
+    },
+    {
       "label": "Drops",
       "description": "Drop table loaded by load_drop_file.rs.",
       "fields": ["drops"]
@@ -174,6 +179,42 @@
     "reputation_grant": {
       "type": "integer",
       "description": "Reputation points granted to the killer per kill (load_npc_rates_file.rs). Defaults to 1 if absent."
+    },
+    "rarity_override": {
+      "type": "object",
+      "title": "Rarity override",
+      "description": "Per-NPC drop-rarity weights. When present, replaces the global rarity_weights.json for THIS NPC's drops. Numbers should sum to 1.0. Leave the entire object absent to use the global default — adding an empty object will cause the server to skip it on next reload.",
+      "required": ["common", "rare", "epic", "legendary"],
+      "properties": {
+        "common": {
+          "type": "number",
+          "title": "Common",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Probability of a common drop from this NPC."
+        },
+        "rare": {
+          "type": "number",
+          "title": "Rare",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Probability of a rare drop from this NPC."
+        },
+        "epic": {
+          "type": "number",
+          "title": "Epic",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Probability of an epic drop from this NPC."
+        },
+        "legendary": {
+          "type": "number",
+          "title": "Legendary",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Probability of a legendary drop from this NPC."
+        }
+      }
     }
   }
 }
