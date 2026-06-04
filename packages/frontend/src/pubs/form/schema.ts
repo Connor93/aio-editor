@@ -32,8 +32,13 @@ export interface JsonSchema {
   /** AIO Editor extension. Renders the field as a labelled select dropdown
    *  instead of a bare input. Free-form values are still accepted on save —
    *  Ajv only sees `type`/`minimum`/etc. — so forward-compat with new
-   *  REOSERV enum variants is preserved. */
-  "x-aio-options"?: Array<{ value: string | number; label: string }>;
+   *  REOSERV enum variants is preserved.
+   *
+   *  Each option may carry an optional `description` that surfaces under
+   *  the dropdown once the option is selected — useful for enums with many
+   *  variants (e.g. the modifier `target` field's 49 stat targets) where
+   *  the label alone isn't self-explanatory. */
+  "x-aio-options"?: Array<{ value: string | number; label: string; description?: string }>;
   /** AIO Editor extension. Declares the field as a cross-pub reference; the
    *  renderer turns the field into a dropdown sourced from the referenced
    *  pub's file list. Today only `by: "filename-id"` is supported (the

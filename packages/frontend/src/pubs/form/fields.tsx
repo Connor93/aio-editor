@@ -554,6 +554,8 @@ function SelectField({
     onChange(picked.value);
   };
 
+  const selectedDescription = matchedIndex >= 0 ? options[matchedIndex]?.description : undefined;
+
   return (
     <label className={`group/field block ${compact ? "w-32" : ""}`}>
       <FieldLabel label={label} required={required} description={schema.description} path={path} compact={compact} />
@@ -575,6 +577,9 @@ function SelectField({
           </option>
         ))}
       </select>
+      {selectedDescription && !compact && (
+        <p className="mt-1 text-xs text-slate-400">{selectedDescription}</p>
+      )}
     </label>
   );
 }
