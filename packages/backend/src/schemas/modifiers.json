@@ -3,12 +3,12 @@
   "title": "Modifier",
   "description": "A single modifier definition that can roll on item instances. See Item Instancing and Item and NPC levels in the vault.",
   "type": "object",
-  "required": ["mod_id", "name", "target", "kind", "low", "high", "tier_eligibility"],
+  "required": ["mod_id", "name", "target", "kind", "low", "high", "tier_eligibility", "item_types"],
   "x-aio-groups": [
     { "label": "Identity", "fields": ["mod_id", "name"] },
     { "label": "Effect", "fields": ["target", "kind"] },
     { "label": "Roll range", "fields": ["low", "high", "level_scaling"] },
-    { "label": "Eligibility", "fields": ["tier_eligibility"] },
+    { "label": "Eligibility", "fields": ["tier_eligibility", "item_types"] },
     { "label": "Condition (optional, raw JSON for now)", "fields": ["when"] }
   ],
   "properties": {
@@ -115,6 +115,21 @@
           { "value": "rare",      "label": "Rare" },
           { "value": "epic",      "label": "Epic" },
           { "value": "legendary", "label": "Legendary" }
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "item_types": {
+      "type": "array",
+      "title": "Eligible item categories",
+      "description": "Which equipment slots this mod can roll on. Mods are filtered by the dropping item's category at roll time. Universal mods (like +STR) declare all three; offensive mods declare 'weapon'; defensive mods declare 'armor'. At least one required.",
+      "items": {
+        "type": "string",
+        "x-aio-options": [
+          { "value": "weapon",    "label": "Weapon",    "description": "Rolls on weapons. Offensive mods (damage, crit, accuracy, attack speed, element damage)." },
+          { "value": "armor",     "label": "Armor",     "description": "Rolls on defensive slots: Shield, Armor, Hat, Boots, Gloves. Defensive mods (HP, armor, evasion, resistances)." },
+          { "value": "accessory", "label": "Accessory", "description": "Rolls on jewelry slots: Accessory, Belt, Necklace, Ring, Armlet, Bracer. Often universal stat / utility mods." }
         ]
       },
       "minItems": 1,

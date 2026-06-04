@@ -1,10 +1,16 @@
 import { useState } from "react";
 
 import type { ApiError } from "../api/client";
-import { type Rarity, type RolledItem, simulateRolls } from "./api";
+import {
+  type ItemCategory,
+  type Rarity,
+  type RolledItem,
+  simulateRolls,
+} from "./api";
 import { Histogram } from "./Histogram";
 
 const RARITIES: Rarity[] = ["common", "rare", "epic", "legendary"];
+const ITEM_CATEGORIES: ItemCategory[] = ["weapon", "armor", "accessory"];
 
 interface RollSimulatorProps {
   token: string;
@@ -20,6 +26,7 @@ interface ModBucket {
 
 export function RollSimulator({ token, onUnauthorized }: RollSimulatorProps) {
   const [itemLevel, setItemLevel] = useState(25);
+  const [itemCategory, setItemCategory] = useState<ItemCategory>("weapon");
   const [rarity, setRarity] = useState<Rarity>("rare");
   const [count, setCount] = useState(500);
   const [results, setResults] = useState<RolledItem[]>([]);
@@ -32,6 +39,7 @@ export function RollSimulator({ token, onUnauthorized }: RollSimulatorProps) {
     try {
       const res = await simulateRolls(token, {
         item_level: itemLevel,
+        item_category: itemCategory,
         rarity,
         count,
       });
@@ -92,6 +100,20 @@ export function RollSimulator({ token, onUnauthorized }: RollSimulatorProps) {
             onChange={(e) => setItemLevel(parseInt(e.target.value) || 1)}
             className="mt-1 w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
           />
+        </label>
+        <label className="flex flex-col text-xs text-slate-400">
+          Item category
+          <select
+            value={itemCategory}
+            onChange={(e) => setItemCategory(e.target.value as ItemCategory)}
+            className="mt-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+          >
+            {ITEM_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col text-xs text-slate-400">
           Rarity
