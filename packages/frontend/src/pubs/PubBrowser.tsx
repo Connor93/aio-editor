@@ -12,6 +12,16 @@ import {
 } from "./api";
 import { SchemaForm } from "./form/SchemaForm";
 import { type JsonSchema, makeDefault } from "./form/schema";
+import {
+  type PubFileDiff,
+  type StagedFileEntry,
+  discardStaged,
+  fetchDiff,
+  fetchStaging,
+  pushStaged,
+} from "./staging/api";
+import { DiffView } from "./staging/DiffView";
+import { StagingPanel } from "./staging/StagingPanel";
 import type {
   PubFile,
   PubFileContent,
@@ -39,6 +49,10 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
   const [editorMode, setEditorMode] = useState<EditorMode>("form");
+  const [staged, setStaged] = useState<StagedFileEntry[] | null>(null);
+  const [diff, setDiff] = useState<PubFileDiff | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [stagingBusy, setStagingBusy] = useState(false);
 
   const handleApiError = useCallback(
     (err: unknown, fallback: string): void => {
@@ -66,6 +80,25 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
       });
     return () => ctrl.abort();
   }, [token, handleApiError]);
+
+  const refreshStaging = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const files = await fetchStaging(token, signal);
+        if (!signal?.aborted) setStaged(files);
+      } catch (err) {
+        if (signal?.aborted) return;
+        handleApiError(err, "failed to load staging");
+      }
+    },
+    [token, handleApiError]
+  );
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    refreshStaging(ctrl.signal);
+    return () => ctrl.abort();
+  }, [refreshStaging]);
 
   useEffect(() => {
     if (selectedType === null) return;
@@ -147,6 +180,111 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
     return `${String(next).padStart(width, "0")}.json`;
   }
 
+  async function onPushOne() {
+    if (!selection) return;
+    setStagingBusy(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      const result = await pushStaged(
+        [{ type: selection.type, filename: selection.filename }],
+        token
+      );
+      if (result.errors.length > 0) {
+        setError(result.errors.map((e) => e.message).join("; "));
+      } else {
+        setStatusMessage("pushed to live");
+        // After a push the file is live, no longer staged.
+        if (fileContent) {
+          setFileContent({ ...fileContent, staged: false, source: "live" });
+        }
+        if (files) {
+          setFiles(
+            files.map((f) =>
+              f.filename === selection.filename ? { ...f, staged: false } : f
+            )
+          );
+        }
+        await refreshStaging();
+      }
+    } catch (err) {
+      handleApiError(err, "push failed");
+    } finally {
+      setStagingBusy(false);
+    }
+  }
+
+  async function onPushAll() {
+    setStagingBusy(true);
+    try {
+      const result = await pushStaged("all", token);
+      if (result.errors.length > 0) {
+        setError(result.errors.map((e) => `${e.type}/${e.filename}: ${e.message}`).join("; "));
+      } else {
+        setStatusMessage(`pushed ${result.pushed.length} file${result.pushed.length === 1 ? "" : "s"} to live`);
+      }
+      await refreshStaging();
+      // The currently selected file may also have been pushed — reload its
+      // metadata so the toolbar badges and form view stay correct.
+      if (selection) {
+        try {
+          const fresh = await fetchPubFile(selection.type, selection.filename, token);
+          setFileContent(fresh);
+          setDraft(fresh.content);
+        } catch {
+          // best-effort refresh; non-blocking
+        }
+      }
+      if (selectedType && files) {
+        const refreshed = await fetchPubFiles(selectedType, token);
+        setFiles(refreshed);
+      }
+    } finally {
+      setStagingBusy(false);
+    }
+  }
+
+  async function onDiscard() {
+    if (!selection) return;
+    setStagingBusy(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      await discardStaged(selection.type, selection.filename, token);
+      // Refetch so the editor shows the live content (and clears staged state).
+      const fresh = await fetchPubFile(selection.type, selection.filename, token);
+      setFileContent(fresh);
+      setDraft(fresh.content);
+      if (files) {
+        setFiles(
+          files.map((f) =>
+            f.filename === selection.filename ? { ...f, staged: false } : f
+          )
+        );
+      }
+      setStatusMessage("discarded staged change");
+      await refreshStaging();
+    } catch (err) {
+      handleApiError(err, "discard failed");
+    } finally {
+      setStagingBusy(false);
+    }
+  }
+
+  async function onOpenDiff() {
+    if (!selection) return;
+    setDiffLoading(true);
+    setError(null);
+    try {
+      const d = await fetchDiff(selection.type, selection.filename, token);
+      setDiff(d);
+    } catch (err) {
+      handleApiError(err, "diff failed");
+    } finally {
+      setDiffLoading(false);
+    }
+  }
+
   async function onCreateNew() {
     if (!selectedType || !canCreateNew || !files) return;
     // Capture state at the start so a mid-flight selectedType change can't
@@ -223,6 +361,18 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
   return (
     <div className="grid h-full grid-cols-[14rem_20rem_1fr] gap-0 border-t border-slate-800">
       <aside className="flex min-h-0 flex-col border-r border-slate-800 bg-slate-950/40">
+        <StagingPanel
+          staged={staged}
+          selectedType={selection?.type ?? null}
+          selectedFilename={selection?.filename ?? null}
+          busy={stagingBusy}
+          onSelect={(entry) => {
+            setSelectedType(entry.type);
+            setSelection({ type: entry.type, filename: entry.filename });
+          }}
+          onPushAll={onPushAll}
+          onError={handleApiError}
+        />
         <div className="border-b border-slate-800/60 px-3 py-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             Pub types
@@ -374,6 +524,34 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                   <span className="text-xs text-emerald-400">{statusMessage}</span>
                 )}
                 {error && <span className="text-xs text-red-400">{error}</span>}
+                {fileContent?.staged && (
+                  <>
+                    <button
+                      onClick={onOpenDiff}
+                      disabled={stagingBusy || diffLoading}
+                      className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50"
+                      title="Show diff against live"
+                    >
+                      {diffLoading ? "…" : "Diff"}
+                    </button>
+                    <button
+                      onClick={onDiscard}
+                      disabled={stagingBusy}
+                      className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50"
+                      title="Discard staged change; revert to live"
+                    >
+                      Discard
+                    </button>
+                    <button
+                      onClick={onPushOne}
+                      disabled={stagingBusy}
+                      className="rounded-md border border-amber-700/60 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                      title="Atomically copy staging → live"
+                    >
+                      Push to live
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={onSave}
                   disabled={!dirty || saving}
@@ -434,6 +612,36 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
           </>
         )}
       </section>
+
+      {diff && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur"
+          onClick={() => setDiff(null)}
+        >
+          <div
+            className="flex max-h-[80vh] w-full max-w-4xl flex-col rounded-lg border border-slate-800 bg-slate-900 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2">
+              <h3 className="font-mono text-sm text-slate-200">
+                {diff.type}/{diff.filename}
+                <span className="ml-2 text-[10px] uppercase tracking-wide text-slate-500">
+                  diff
+                </span>
+              </h3>
+              <button
+                onClick={() => setDiff(null)}
+                className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-800"
+              >
+                close
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-3">
+              <DiffView live={diff.live} staging={diff.staging} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

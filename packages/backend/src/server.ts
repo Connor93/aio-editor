@@ -4,7 +4,9 @@ import Fastify from "fastify";
 import { registerAuthGuard } from "./auth/verify.js";
 import { config } from "./config.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerGfxRoutes } from "./routes/gfx.js";
 import { registerPubRoutes } from "./routes/pubs.js";
+import { registerStagingRoutes } from "./routes/staging.js";
 
 async function main() {
   const app = Fastify({
@@ -20,11 +22,16 @@ async function main() {
 
   await registerAuthRoutes(app);
 
-  // Bearer-token guard for /api/pubs/* and /api/schemas/*; /api/health and
-  // /api/auth stay public so login + liveness checks don't require a token.
+  // Bearer-token guard for /api/pubs/*, /api/schemas/*, /api/staging/*;
+  // /api/health and /api/auth stay public so login + liveness checks don't
+  // require a token.
   registerAuthGuard(app, "/api/pubs");
   registerAuthGuard(app, "/api/schemas");
+  registerAuthGuard(app, "/api/staging");
+  registerAuthGuard(app, "/api/gfx");
   await registerPubRoutes(app);
+  await registerStagingRoutes(app);
+  await registerGfxRoutes(app);
 
   try {
     await app.listen({ port: config.port, host: config.host });
@@ -36,6 +43,7 @@ async function main() {
     );
     app.log.info(`  pub data:      ${config.pubDataDir}`);
     app.log.info(`  staging:       ${config.stagingDir}`);
+    app.log.info(`  gfx root:      ${config.gfxRoot ?? "(disabled)"}`);
   } catch (err) {
     app.log.error({ err }, "failed to start server");
     process.exit(1);
