@@ -5,26 +5,42 @@ import type { FastifyInstance } from "fastify";
 
 import { config } from "../config.js";
 
-/** EO GFX category → numeric file id (matches eolib's GfxType). Each
- *  category maps to a `gfxNNN/` directory of pre-extracted PNGs. */
-const CATEGORY_TO_FILE_ID: Record<string, number> = {
-  npcs: 21,
-  items: 23,
-  spells: 24,
-  spell_icons: 25,
+/** EO GFX category → { numeric file id matching eolib's GfxType, formula
+ *  mapping a pub-level graphic_id to the underlying on-disk sprite index
+ *  inside the gfxNNN/ directory. All extracted PNGs share a +100 base
+ *  offset (the PE-format DIBs in the original .egf files start their
+ *  resource ids at 100), so every formula here folds that constant in:
+ *    - items:       100 + graphic_id * 2     (shown sprite; shadow at -1)
+ *    - npcs:        100 + (graphic_id - 1) * 40 + 1  — 18 frames per NPC at a
+ *                                                     40-frame stride; +1 = idle
+ *    - spells:      100 + (graphic_id - 1) * 3 + 1   — 3 frames per spell
+ *                                                     graphic; +1 = frame 1
+ *    - spell_icons: 100 + icon_id            (single sprite per icon)
+ */
+interface CategorySpec {
+  fileId: number;
+  resourceIdFor: (graphicId: number) => number;
+}
+const CATEGORIES: Record<string, CategorySpec> = {
+  items: {
+    fileId: 23,
+    resourceIdFor: (g) => 100 + g * 2,
+  },
+  npcs: {
+    fileId: 21,
+    resourceIdFor: (g) => 100 + (g - 1) * 40 + 1,
+  },
+  spells: {
+    fileId: 24,
+    resourceIdFor: (g) => 100 + (g - 1) * 3 + 1,
+  },
+  spell_icons: {
+    fileId: 25,
+    resourceIdFor: (g) => 100 + g,
+  },
 };
 
 const SAFE_CATEGORY = /^[a-z_]+$/;
-
-/**
- * eolib's `useItemGfx`: `resourceId = 100 + graphicId * 2` (the shown sprite;
- * the shadow is at `+ - 1`). Same shape for items / spells / spell-icons in
- * eoweb. We don't expose the shadow variant today — designers picking an item
- * graphic want the foreground sprite.
- */
-function resourceIdFor(graphicId: number): number {
-  return 100 + graphicId * 2;
-}
 
 export async function registerGfxRoutes(app: FastifyInstance) {
   app.get<{ Params: { category: string; graphicId: string } }>(
@@ -40,8 +56,8 @@ export async function registerGfxRoutes(app: FastifyInstance) {
       if (!SAFE_CATEGORY.test(category)) {
         return reply.code(400).send({ error: "invalid category" });
       }
-      const fileId = CATEGORY_TO_FILE_ID[category];
-      if (fileId === undefined) {
+      const spec = CATEGORIES[category];
+      if (spec === undefined) {
         return reply.code(404).send({ error: "unknown gfx category" });
       }
 
@@ -54,8 +70,8 @@ export async function registerGfxRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: "no graphic" });
       }
 
-      const resourceId = resourceIdFor(graphicId);
-      const dirName = `gfx${String(fileId).padStart(3, "0")}`;
+      const resourceId = spec.resourceIdFor(graphicId);
+      const dirName = `gfx${String(spec.fileId).padStart(3, "0")}`;
       const pngPath = resolvePath(config.gfxRoot, dirName, `${resourceId}.png`);
 
       // Defensive: the resolved path must stay inside GFX_ROOT.
