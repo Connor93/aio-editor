@@ -29,9 +29,9 @@
       "fields": ["attack_rate_ms", "move_rate_ms", "reputation_grant"]
     },
     {
-      "label": "Level + XP",
-      "description": "NPC level + per-NPC XP multiplier. XP grant = base_npc_xp × level_curve(level) × exp_multiplier × party_share × kill_eff.xp_gain. base_npc_xp lives in Config.toml. The legacy EO `experience` field is ignored — designers tune via level + multiplier.",
-      "fields": ["level", "exp_multiplier"]
+      "label": "Level + scaling",
+      "description": "NPC level drives HP, damage, and XP grants — each multiplied by the corresponding per-NPC tuner. Final values = base × level_curve(level) × multiplier. Base values live in Config.toml under [world]. The legacy EO pub fields (hp, min_damage, max_damage, experience) are all ignored.",
+      "fields": ["level", "hp_multiplier", "damage_multiplier", "exp_multiplier"]
     },
     {
       "label": "Rarity override",
@@ -191,6 +191,18 @@
       "title": "XP multiplier",
       "minimum": 0,
       "description": "Per-NPC fine-tune on the level-scaled XP grant. 1.0 = exactly what the curve says; 1.5 = 50% more (story or boss NPCs); 0.5 = half (filler or weak NPCs). Multiplies on top of level_curve(level). Defaults to 1.0 if absent."
+    },
+    "hp_multiplier": {
+      "type": "number",
+      "title": "HP multiplier",
+      "minimum": 0,
+      "description": "Per-NPC fine-tune on max HP. 1.0 = curve baseline; 3.0 = tanky boss (3× the HP of a same-level regular); 0.5 = squishy filler. Final HP = base_npc_hp × level_curve(level) × hp_multiplier. Defaults to 1.0 if absent."
+    },
+    "damage_multiplier": {
+      "type": "number",
+      "title": "Damage multiplier",
+      "minimum": 0,
+      "description": "Per-NPC fine-tune on dealt damage. 1.0 = curve baseline; 2.5 = hard-hitting boss; 0.6 = pushover. Applied to both min and max base damage. Defaults to 1.0 if absent."
     },
     "rarity_override": {
       "type": "object",
