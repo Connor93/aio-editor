@@ -33,6 +33,11 @@
       "fields": ["attack_rate_ms", "move_rate_ms", "reputation_grant"]
     },
     {
+      "label": "Level + XP",
+      "description": "NPC level + per-NPC XP multiplier. XP grant = base × level_curve(level) × exp_multiplier.",
+      "fields": ["level", "exp_multiplier"]
+    },
+    {
       "label": "Rarity override",
       "description": "Per-NPC drop-rarity distribution. When set, replaces the global rarity_weights.json for this NPC's drops. Leave absent to use the global. Use for bosses that should skew toward higher rarities.",
       "fields": ["rarity_override"]
@@ -179,6 +184,19 @@
     "reputation_grant": {
       "type": "integer",
       "description": "Reputation points granted to the killer per kill (load_npc_rates_file.rs). Defaults to 1 if absent."
+    },
+    "level": {
+      "type": "integer",
+      "title": "Level",
+      "minimum": 1,
+      "maximum": 50,
+      "description": "NPC level (1..50). Drives XP scaling — level 25 grants ~3.4× the curve's base XP, level 50 ~5.9×. Will also drive item-level on drops once Phase 4 wires the drop path. Defaults to 1 if absent."
+    },
+    "exp_multiplier": {
+      "type": "number",
+      "title": "XP multiplier",
+      "minimum": 0,
+      "description": "Per-NPC fine-tune on the level-scaled XP grant. 1.0 = exactly what the curve says; 1.5 = 50% more (story or boss NPCs); 0.5 = half (filler or weak NPCs). Multiplies on top of level_curve(level). Defaults to 1.0 if absent."
     },
     "rarity_override": {
       "type": "object",
