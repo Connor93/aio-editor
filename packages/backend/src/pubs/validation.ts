@@ -7,6 +7,7 @@ import itemsSchema from "../schemas/items.json" with { type: "json" };
 import mapModulesSchema from "../schemas/map_modules.json" with { type: "json" };
 import modifiersSchema from "../schemas/modifiers.json" with { type: "json" };
 import npcsSchema from "../schemas/npcs.json" with { type: "json" };
+import rarityWeightsSchema from "../schemas/rarity_weights.json" with { type: "json" };
 import reputationTiersSchema from "../schemas/reputation_tiers.json" with { type: "json" };
 import shopsSchema from "../schemas/shops.json" with { type: "json" };
 import skillMastersSchema from "../schemas/skill_masters.json" with { type: "json" };
@@ -23,6 +24,7 @@ const rawSchemas: Record<string, object> = {
   map_modules: mapModulesSchema,
   modifiers: modifiersSchema,
   npcs: npcsSchema,
+  rarity_weights: rarityWeightsSchema,
   reputation_tiers: reputationTiersSchema,
   shops: shopsSchema,
   skill_masters: skillMastersSchema,

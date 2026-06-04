@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Rarity weights",
+  "description": "Global default distribution of item-drop rarities. Per-NPC overrides live on the NPC pub via the rarity_override field. The four numbers should sum to 1.0 (the server normalizes if not, but designer intent is clearer with weights that already sum cleanly).",
+  "type": "object",
+  "required": ["common", "rare", "epic", "legendary"],
+  "x-aio-groups": [
+    {
+      "label": "Rarity distribution (should sum to 1.0)",
+      "fields": ["common", "rare", "epic", "legendary"]
+    }
+  ],
+  "properties": {
+    "common": {
+      "type": "number",
+      "title": "Common",
+      "description": "Probability of a common drop. Common drops carry 1 mod (per the per-tier mod count).",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "rare": {
+      "type": "number",
+      "title": "Rare",
+      "description": "Probability of a rare drop. Rare drops carry 2 mods.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "epic": {
+      "type": "number",
+      "title": "Epic",
+      "description": "Probability of an epic drop. Epic drops carry 3 mods and unlock the conditional mod pool (Berserker, Predator, Slayer).",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "legendary": {
+      "type": "number",
+      "title": "Legendary",
+      "description": "Probability of a legendary drop. Legendary drops carry 4 mods.",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}
