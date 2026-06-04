@@ -22,13 +22,15 @@ async function main() {
 
   await registerAuthRoutes(app);
 
-  // Bearer-token guard for /api/pubs/*, /api/schemas/*, /api/staging/*;
+  // Bearer-token guard for /api/pubs/*, /api/schemas/*, /api/staging/*.
   // /api/health and /api/auth stay public so login + liveness checks don't
-  // require a token.
+  // require a token. /api/gfx/* stays public because the browser's <img>
+  // tag can't carry a custom Authorization header — the content is EO
+  // client assets (publicly available in any EO install), not business
+  // data. The route's path-safety check is independent of auth.
   registerAuthGuard(app, "/api/pubs");
   registerAuthGuard(app, "/api/schemas");
   registerAuthGuard(app, "/api/staging");
-  registerAuthGuard(app, "/api/gfx");
   await registerPubRoutes(app);
   await registerStagingRoutes(app);
   await registerGfxRoutes(app);
