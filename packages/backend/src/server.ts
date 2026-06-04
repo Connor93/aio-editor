@@ -6,6 +6,7 @@ import { config } from "./config.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerGfxRoutes } from "./routes/gfx.js";
 import { registerPubRoutes } from "./routes/pubs.js";
+import { registerSimulateRollRoutes } from "./routes/simulate_roll.js";
 import { registerStagingRoutes } from "./routes/staging.js";
 
 async function main() {
@@ -31,9 +32,11 @@ async function main() {
   registerAuthGuard(app, "/api/pubs");
   registerAuthGuard(app, "/api/schemas");
   registerAuthGuard(app, "/api/staging");
+  registerAuthGuard(app, "/api/simulate_roll");
   await registerPubRoutes(app);
   await registerStagingRoutes(app);
   await registerGfxRoutes(app);
+  await registerSimulateRollRoutes(app);
 
   try {
     await app.listen({ port: config.port, host: config.host });
