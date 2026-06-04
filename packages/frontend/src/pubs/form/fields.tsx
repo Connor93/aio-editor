@@ -89,6 +89,7 @@ function GfxField({
   const stored = typeof value === "number" ? value : 0;
   const [draftStr, setDraftStr] = useState<string>(String(stored));
   const lastEchoed = useRef<number>(stored);
+  const [pickerOpen, setPickerOpen] = useState(false);
   useEffect(() => {
     if (stored !== lastEchoed.current) {
       setDraftStr(String(stored));
@@ -106,12 +107,27 @@ function GfxField({
     onChange(committed);
   };
 
+  const handlePick = (graphicId: number) => {
+    lastEchoed.current = graphicId;
+    setDraftStr(String(graphicId));
+    onChange(graphicId);
+    setPickerOpen(false);
+  };
+
   const previewSrc = stored > 0 ? `/api/gfx/${category}/${stored}` : null;
 
   return (
-    <label className="group/field block">
+    <div className="group/field block">
       <FieldLabel label={label} required={required} description={schema.description} path={path} compact={compact} />
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="rounded border border-slate-700 p-0.5 hover:border-slate-500 hover:bg-slate-800/60"
+          title={`Click to browse ${category} graphics`}
+        >
+          <GfxThumb src={previewSrc} category={category} graphicId={stored} />
+        </button>
         <input
           type="number"
           value={draftStr}
@@ -119,11 +135,158 @@ function GfxField({
           min={schema.minimum ?? 0}
           max={schema.maximum}
           onChange={(e) => onInputChange(e.target.value)}
-          className={`${INPUT_BASE} ${INPUT_OK} w-32 tabular-nums`}
+          className={`${INPUT_BASE} ${INPUT_OK} w-24 tabular-nums`}
+          title="Type a graphic id directly"
         />
-        <GfxThumb src={previewSrc} category={category} graphicId={stored} />
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
+        >
+          browse…
+        </button>
       </div>
-    </label>
+      {pickerOpen && (
+        <GraphicPicker
+          category={category}
+          currentId={stored}
+          onPick={handlePick}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface GraphicEntry {
+  graphic_id: number;
+  resource_id: number;
+}
+
+function GraphicPicker({
+  category,
+  currentId,
+  onPick,
+  onClose,
+}: {
+  category: string;
+  currentId: number;
+  onPick: (graphicId: number) => void;
+  onClose: () => void;
+}) {
+  const [graphics, setGraphics] = useState<GraphicEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/gfx/${category}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as { graphics: GraphicEntry[] };
+      })
+      .then((d) => {
+        if (!cancelled) setGraphics(d.graphics);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [category]);
+
+  const filtered = useMemo(() => {
+    if (!graphics) return [];
+    const q = filter.trim();
+    if (!q) return graphics;
+    return graphics.filter((g) => String(g.graphic_id).includes(q));
+  }, [graphics, filter]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[80vh] w-full max-w-5xl flex-col rounded-lg border border-slate-800 bg-slate-900 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-4 py-2">
+          <div className="flex items-baseline gap-3">
+            <h3 className="text-sm font-semibold text-slate-200">
+              Pick a {category.replace("_", " ")} graphic
+            </h3>
+            {graphics && (
+              <span className="text-[11px] text-slate-500">
+                {graphics.length} available
+                {filter && ` · ${filtered.length} match`}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="filter by id…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className={`${INPUT_BASE} ${INPUT_OK} w-40 text-xs tabular-nums`}
+              autoFocus
+            />
+            <button
+              onClick={onClose}
+              className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-800"
+            >
+              close
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          {error && (
+            <div className="rounded border border-red-900/40 bg-red-950/30 p-3 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+          {graphics === null && !error && (
+            <p className="px-2 py-1 text-sm text-slate-500">loading…</p>
+          )}
+          {graphics !== null && filtered.length === 0 && (
+            <p className="px-2 py-1 text-sm text-slate-500">no matches</p>
+          )}
+          {filtered.length > 0 && (
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2">
+              {filtered.map((g) => {
+                const selected = g.graphic_id === currentId;
+                return (
+                  <li key={g.graphic_id}>
+                    <button
+                      type="button"
+                      onClick={() => onPick(g.graphic_id)}
+                      className={`flex w-full flex-col items-center gap-1 rounded border p-1 transition-colors ${
+                        selected
+                          ? "border-amber-500 bg-amber-500/10"
+                          : "border-slate-700 hover:border-slate-500 hover:bg-slate-800/60"
+                      }`}
+                      title={`graphic_id ${g.graphic_id} (resource ${g.resource_id})`}
+                    >
+                      <img
+                        src={`/api/gfx/${category}/${g.graphic_id}`}
+                        alt={`${category} ${g.graphic_id}`}
+                        loading="lazy"
+                        className="h-12 w-12 object-contain"
+                      />
+                      <span className="font-mono text-[10px] text-slate-400">
+                        {g.graphic_id}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
