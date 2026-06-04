@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Modifier",
+  "description": "A single modifier definition that can roll on item instances. See Item Instancing and Item and NPC levels in the vault.",
+  "type": "object",
+  "required": ["mod_id", "target", "kind", "low", "high", "tier_eligibility"],
+  "x-aio-groups": [
+    { "label": "Identity", "fields": ["mod_id"] },
+    { "label": "Effect", "fields": ["target", "kind"] },
+    { "label": "Roll range", "fields": ["low", "high", "level_scaling"] },
+    { "label": "Eligibility", "fields": ["tier_eligibility"] },
+    { "label": "Condition (optional, raw JSON for now)", "fields": ["when"] }
+  ],
+  "properties": {
+    "mod_id": {
+      "type": "string",
+      "title": "Mod ID",
+      "description": "Stable identifier referenced in rolled item instances. Use snake_case. Never rename — change cascades through every existing rolled item."
+    },
+    "target": {
+      "type": "string",
+      "title": "Stat target",
+      "description": "Which EffectiveStats field this mod feeds.",
+      "enum": [
+        "str", "int", "wis", "agi", "con", "cha",
+        "max_hp", "max_tp", "max_sp", "hp_regen", "tp_regen", "sp_regen",
+        "damage_dealt", "damage_taken", "accuracy", "evasion", "armor",
+        "crit_chance", "crit_damage", "crit_damage_taken", "crit_resistance",
+        "attack_speed", "move_speed",
+        "damage_dealt_fire", "damage_dealt_water", "damage_dealt_earth",
+        "damage_dealt_wind", "damage_dealt_light", "damage_dealt_dark",
+        "damage_taken_fire", "damage_taken_water", "damage_taken_earth",
+        "damage_taken_wind", "damage_taken_light", "damage_taken_dark",
+        "healing_dealt", "healing_received",
+        "xp_gain", "gold_gain", "rep_gain", "drop_chance", "magic_find",
+        "slow_resistance", "poison_resistance", "root_resistance",
+        "status_duration_self", "status_duration_dealt",
+        "cooldown_reduction", "mana_cost_reduction"
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "title": "Stacking bucket",
+      "description": "Effect engine stacking bucket. flat adds to the base; percent_additive sums with other additive mods; percent_multiplicative compounds with other multiplicative mods.",
+      "enum": ["flat", "percent_additive", "percent_multiplicative"]
+    },
+    "low": {
+      "type": "number",
+      "title": "Roll low",
+      "description": "Low end of the value range at item level 1 with level_scaling 1.0. Scaled at roll time by level_curve(item.level) × level_scaling."
+    },
+    "high": {
+      "type": "number",
+      "title": "Roll high",
+      "description": "High end of the same range. Must be ≥ low."
+    },
+    "level_scaling": {
+      "type": "number",
+      "title": "Level scaling factor",
+      "description": "How strongly the roll range scales with item level. 1.0 = normal. 0.0 = doesn't scale (use for qualitative mods). 2.0 = steep (very impactful at high level).",
+      "default": 1.0
+    },
+    "tier_eligibility": {
+      "type": "array",
+      "title": "Eligible rarity tiers",
+      "description": "Which item rarities can roll this mod. At least one required.",
+      "items": {
+        "type": "string",
+        "enum": ["common", "rare", "epic", "legendary"]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "when": {
+      "type": "object",
+      "title": "Optional condition (raw JSON)",
+      "description": "Effect-engine Condition that gates when this mod's bonus applies. Hand-edit JSON for now — discriminated-union form rendering is a follow-on slice. Example: {\"type\":\"self_hp_below_pct\",\"pct\":30}"
+    }
+  }
+}
