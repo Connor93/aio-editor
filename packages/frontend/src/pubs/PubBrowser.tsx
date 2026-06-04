@@ -32,6 +32,18 @@ import type {
 
 type EditorMode = "form" | "json";
 
+/** Fallback display label for files whose JSON has no top-level `name`.
+ *  Strips `.json`, replaces underscores with spaces, and title-cases each
+ *  word — e.g. `example_fire_dmg.json` → `Example Fire Dmg`. Used in the
+ *  file picker so single-config pubs (zones.json, reputation_tiers.json)
+ *  don't show "(unnamed)" by default. */
+function humanizeFilename(filename: string): string {
+  return filename
+    .replace(/\.json$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 interface PubBrowserProps {
   token: string;
   onUnauthorized: () => void;
@@ -457,7 +469,9 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                       )}
                       <span className="min-w-0 flex-1 truncate">
                         {f.name ?? (
-                          <span className="italic text-slate-500">(unnamed)</span>
+                          <span className="text-slate-400">
+                            {humanizeFilename(f.filename)}
+                          </span>
                         )}
                       </span>
                       <span className="shrink-0 font-mono text-[10px] text-slate-500">

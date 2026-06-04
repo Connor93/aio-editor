@@ -3,9 +3,9 @@
   "title": "Modifier",
   "description": "A single modifier definition that can roll on item instances. See Item Instancing and Item and NPC levels in the vault.",
   "type": "object",
-  "required": ["mod_id", "target", "kind", "low", "high", "tier_eligibility"],
+  "required": ["mod_id", "name", "target", "kind", "low", "high", "tier_eligibility"],
   "x-aio-groups": [
-    { "label": "Identity", "fields": ["mod_id"] },
+    { "label": "Identity", "fields": ["mod_id", "name"] },
     { "label": "Effect", "fields": ["target", "kind"] },
     { "label": "Roll range", "fields": ["low", "high", "level_scaling"] },
     { "label": "Eligibility", "fields": ["tier_eligibility"] },
@@ -16,6 +16,11 @@
       "type": "string",
       "title": "Mod ID",
       "description": "Stable identifier referenced in rolled item instances. Use snake_case. Never rename — change cascades through every existing rolled item."
+    },
+    "name": {
+      "type": "string",
+      "title": "Display name",
+      "description": "Player-facing name shown in item descriptions on rolled items (e.g. 'Burning', 'Of Fire'). Separate from mod_id so designers can rename for clarity without breaking existing rolled instances."
     },
     "target": {
       "type": "string",
