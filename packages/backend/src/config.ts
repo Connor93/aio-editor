@@ -12,6 +12,9 @@ function requireEnv(name: string): string {
 }
 
 const pubDataDir = resolve(requireEnv("PUB_DATA_DIR"));
+const gfxRoot = process.env.GFX_ROOT?.trim()
+  ? resolve(process.env.GFX_ROOT.trim())
+  : null;
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
@@ -19,4 +22,5 @@ export const config = {
   reoservBaseUrl: process.env.REOSERV_BASE_URL ?? "http://127.0.0.1:8090",
   pubDataDir,
   stagingDir: resolve(pubDataDir, ".staging"),
+  gfxRoot,
 };

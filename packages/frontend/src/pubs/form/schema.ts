@@ -53,11 +53,18 @@ export interface JsonSchema {
    *  percentage (displayed = stored / divisor); useful for fields that
    *  REOSERV stores as integers rolled against a fixed divisor (e.g. drop
    *  rate stored as 0..64000 but conceptually a percentage). */
-  "x-aio-display"?: {
-    kind: "percent";
-    /** Stored ↔ displayed conversion factor. displayed = stored / divisor. */
-    divisor: number;
-  };
+  "x-aio-display"?:
+    | {
+        kind: "percent";
+        /** Stored ↔ displayed conversion factor. displayed = stored / divisor. */
+        divisor: number;
+      }
+    | {
+        kind: "gfx";
+        /** GFX category to load images from. Backend maps this to a
+         *  `gfxNNN/` directory and computes `resource_id = 100 + value*2`. */
+        category: "items" | "npcs" | "spells" | "spell_icons";
+      };
 }
 
 /**

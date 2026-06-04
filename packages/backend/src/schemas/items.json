@@ -51,7 +51,11 @@
   ],
   "properties": {
     "name": { "type": "string", "minLength": 1 },
-    "graphic_id": { "type": "integer", "minimum": 0 },
+    "graphic_id": {
+      "type": "integer",
+      "minimum": 0,
+      "x-aio-display": { "kind": "gfx", "category": "items" }
+    },
     "type": {
       "type": "integer",
       "minimum": 0,

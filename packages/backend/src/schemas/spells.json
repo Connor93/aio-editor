@@ -41,8 +41,16 @@
   "properties": {
     "name": { "type": "string", "minLength": 1 },
     "chant": { "type": "string", "description": "Spoken chant string shown in-game when cast." },
-    "icon_id": { "type": "integer", "minimum": 0 },
-    "graphic_id": { "type": "integer", "minimum": 0 },
+    "icon_id": {
+      "type": "integer",
+      "minimum": 0,
+      "x-aio-display": { "kind": "gfx", "category": "spell_icons" }
+    },
+    "graphic_id": {
+      "type": "integer",
+      "minimum": 0,
+      "x-aio-display": { "kind": "gfx", "category": "spells" }
+    },
     "tp_cost": { "type": "integer", "minimum": 0 },
     "sp_cost": { "type": "integer", "minimum": 0 },
     "cast_time": { "type": "integer", "minimum": 0 },

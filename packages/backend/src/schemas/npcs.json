@@ -45,7 +45,11 @@
   ],
   "properties": {
     "name": { "type": "string", "minLength": 1 },
-    "graphic_id": { "type": "integer", "minimum": 0 },
+    "graphic_id": {
+      "type": "integer",
+      "minimum": 0,
+      "x-aio-display": { "kind": "gfx", "category": "npcs" }
+    },
     "race": { "type": "integer", "minimum": 0 },
     "boss": { "type": "boolean" },
     "child": { "type": "boolean" },

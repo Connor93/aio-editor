@@ -39,6 +39,10 @@ export function SchemaField(props: CommonProps) {
     return <PercentField {...props} schema={resolved} />;
   }
 
+  if (resolved["x-aio-display"]?.kind === "gfx") {
+    return <GfxField {...props} schema={resolved} />;
+  }
+
   if (resolved.type === "object") {
     if (resolved.properties) return <ObjectField {...props} schema={resolved} />;
     if (resolved.additionalProperties && resolved.additionalProperties !== true)
@@ -68,6 +72,120 @@ export function SchemaField(props: CommonProps) {
   );
 }
 
+function GfxField({
+  schema,
+  value,
+  onChange,
+  path,
+  label,
+  required,
+  compact,
+}: CommonProps) {
+  const display = schema["x-aio-display"]!;
+  if (display.kind !== "gfx") {
+    return <div className="text-xs text-amber-400">expected gfx display</div>;
+  }
+  const category = display.category;
+  const stored = typeof value === "number" ? value : 0;
+  const [draftStr, setDraftStr] = useState<string>(String(stored));
+  const lastEchoed = useRef<number>(stored);
+  useEffect(() => {
+    if (stored !== lastEchoed.current) {
+      setDraftStr(String(stored));
+      lastEchoed.current = stored;
+    }
+  }, [stored]);
+
+  const onInputChange = (raw: string) => {
+    setDraftStr(raw);
+    if (raw === "" || raw === "-") return;
+    const next = Number(raw);
+    if (!Number.isFinite(next)) return;
+    const committed = Math.trunc(next);
+    lastEchoed.current = committed;
+    onChange(committed);
+  };
+
+  const previewSrc = stored > 0 ? `/api/gfx/${category}/${stored}` : null;
+
+  return (
+    <label className="group/field block">
+      <FieldLabel label={label} required={required} description={schema.description} path={path} compact={compact} />
+      <div className="flex items-center gap-3">
+        <input
+          type="number"
+          value={draftStr}
+          step={1}
+          min={schema.minimum ?? 0}
+          max={schema.maximum}
+          onChange={(e) => onInputChange(e.target.value)}
+          className={`${INPUT_BASE} ${INPUT_OK} w-32 tabular-nums`}
+        />
+        <GfxThumb src={previewSrc} category={category} graphicId={stored} />
+      </div>
+    </label>
+  );
+}
+
+function GfxThumb(props: { src: string | null; category: string; graphicId: number }) {
+  // Re-mount on src change so internal state resets cleanly and the previous
+  // image doesn't flash through while the new one loads.
+  return <GfxThumbInner key={props.src ?? "none"} {...props} />;
+}
+
+function GfxThumbInner({
+  src,
+  category,
+  graphicId,
+}: {
+  src: string | null;
+  category: string;
+  graphicId: number;
+}) {
+  const [status, setStatus] = useState<"loading" | "loaded" | "missing">(
+    src ? "loading" : "missing"
+  );
+
+  if (!src) {
+    return (
+      <div
+        className="flex h-12 w-12 items-center justify-center rounded border border-dashed border-slate-700 text-[10px] text-slate-600"
+        title={`No ${category} graphic for id 0`}
+      >
+        —
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-12 w-12 shrink-0">
+      <img
+        src={src}
+        alt={`${category} ${graphicId}`}
+        title={`${category}/${graphicId}`}
+        onLoad={() => setStatus("loaded")}
+        onError={() => setStatus("missing")}
+        className={`h-12 w-12 rounded border border-slate-800 bg-slate-950 object-contain p-0.5 transition-opacity ${
+          status === "loaded" ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      {status === "loading" && (
+        <div className="absolute inset-0 flex items-center justify-center rounded border border-slate-800 bg-slate-950 text-[10px] text-slate-600">
+          …
+        </div>
+      )}
+      {status === "missing" && (
+        <div
+          className="absolute inset-0 flex items-center justify-center rounded border border-dashed border-slate-700 text-[10px] text-slate-600"
+          title={`No ${category} graphic for id ${graphicId}`}
+        >
+          ?
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PercentField({
   schema,
   value,
@@ -78,6 +196,9 @@ function PercentField({
   compact,
 }: CommonProps) {
   const display = schema["x-aio-display"]!;
+  if (display.kind !== "percent") {
+    return <div className="text-xs text-amber-400">expected percent display</div>;
+  }
   const divisor = display.divisor;
   const stored = typeof value === "number" ? value : 0;
   const displayed = stored / divisor;
