@@ -24,17 +24,13 @@
       "fields": ["element", "element_damage", "element_weakness", "element_weakness_damage"]
     },
     {
-      "label": "Progression",
-      "fields": ["level", "experience"]
-    },
-    {
       "label": "Rates",
       "description": "Per-NPC cadence overrides loaded by load_npc_rates_file.rs.",
       "fields": ["attack_rate_ms", "move_rate_ms", "reputation_grant"]
     },
     {
       "label": "Level + XP",
-      "description": "NPC level + per-NPC XP multiplier. XP grant = base × level_curve(level) × exp_multiplier.",
+      "description": "NPC level + per-NPC XP multiplier. XP grant = base_npc_xp × level_curve(level) × exp_multiplier × party_share × kill_eff.xp_gain. base_npc_xp lives in Config.toml. The legacy EO `experience` field is ignored — designers tune via level + multiplier.",
       "fields": ["level", "exp_multiplier"]
     },
     {
@@ -125,8 +121,6 @@
       ]
     },
     "element_weakness_damage": { "type": "integer", "minimum": 0 },
-    "level": { "type": "integer", "minimum": 0 },
-    "experience": { "type": "integer", "minimum": 0 },
 
     "drops": {
       "type": "array",
