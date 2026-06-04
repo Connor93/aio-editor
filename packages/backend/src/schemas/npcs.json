@@ -133,7 +133,8 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 64000,
-            "description": "Drop chance, rolled against 0..=64000. 64000 ≈ 100%, 6400 ≈ 10%, 640 ≈ 1%, 64 ≈ 0.1%."
+            "description": "Drop chance as a percentage. Stored as integer 0..=64000 rolled against a 64000-sided die.",
+            "x-aio-display": { "kind": "percent", "divisor": 640 }
           }
         }
       }

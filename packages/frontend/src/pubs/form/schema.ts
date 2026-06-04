@@ -48,6 +48,16 @@ export interface JsonSchema {
      *  warning even if no `0000.json` exists. */
     noneLabel?: string;
   };
+  /** AIO Editor extension. Changes the field's display while keeping the
+   *  stored JSON value unchanged. `kind: "percent"` shows the value as a
+   *  percentage (displayed = stored / divisor); useful for fields that
+   *  REOSERV stores as integers rolled against a fixed divisor (e.g. drop
+   *  rate stored as 0..64000 but conceptually a percentage). */
+  "x-aio-display"?: {
+    kind: "percent";
+    /** Stored ↔ displayed conversion factor. displayed = stored / divisor. */
+    divisor: number;
+  };
 }
 
 /**

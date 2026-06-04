@@ -35,6 +35,10 @@ export function SchemaField(props: CommonProps) {
     return <ReferenceField {...props} schema={resolved} />;
   }
 
+  if (resolved["x-aio-display"]?.kind === "percent") {
+    return <PercentField {...props} schema={resolved} />;
+  }
+
   if (resolved.type === "object") {
     if (resolved.properties) return <ObjectField {...props} schema={resolved} />;
     if (resolved.additionalProperties && resolved.additionalProperties !== true)
@@ -62,6 +66,78 @@ export function SchemaField(props: CommonProps) {
       unsupported schema at {props.path}
     </div>
   );
+}
+
+function PercentField({
+  schema,
+  value,
+  onChange,
+  path,
+  label,
+  required,
+  compact,
+}: CommonProps) {
+  const display = schema["x-aio-display"]!;
+  const divisor = display.divisor;
+  const stored = typeof value === "number" ? value : 0;
+  const displayed = stored / divisor;
+
+  // Local string state mirrors the NumberField pattern so the user can type
+  // intermediate states like "0." or "1.0" without the input snapping back
+  // to the integer-round-trip value on every keystroke.
+  const [draftStr, setDraftStr] = useState<string>(formatPercent(displayed));
+  const lastEchoed = useRef<number>(stored);
+  useEffect(() => {
+    if (stored !== lastEchoed.current) {
+      setDraftStr(formatPercent(stored / divisor));
+      lastEchoed.current = stored;
+    }
+  }, [stored, divisor]);
+
+  const onInputChange = (raw: string) => {
+    setDraftStr(raw);
+    if (raw === "" || raw === "-") return;
+    const next = Number(raw);
+    if (!Number.isFinite(next)) return;
+    const clampedPercent = Math.max(0, Math.min(100, next));
+    const storedValue = Math.round(clampedPercent * divisor);
+    lastEchoed.current = storedValue;
+    onChange(storedValue);
+  };
+
+  const tooltip = `Stored as integer ${stored} (≈ ${displayed.toFixed(4)}%). Max precision ≈ ${(100 / (divisor * 100)).toFixed(4)}%.`;
+
+  return (
+    <label className={`group/field block ${compact ? "w-32" : ""}`} title={tooltip}>
+      <FieldLabel
+        label={label}
+        required={required}
+        description={schema.description}
+        path={path}
+        compact={compact}
+      />
+      <div className="relative">
+        <input
+          type="number"
+          value={draftStr}
+          step="any"
+          min={0}
+          max={100}
+          onChange={(e) => onInputChange(e.target.value)}
+          className={`${INPUT_BASE} ${INPUT_OK} ${compact ? "mt-0.5 w-full" : "w-full"} pr-7 tabular-nums`}
+        />
+        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-slate-500">
+          %
+        </span>
+      </div>
+    </label>
+  );
+}
+
+function formatPercent(p: number): string {
+  // Show up to 4 decimals but strip trailing zeros so 100 renders as "100"
+  // not "100.0000".
+  return String(Number(p.toFixed(4)));
 }
 
 function ReferenceField({
