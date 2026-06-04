@@ -21,28 +21,67 @@
       "type": "string",
       "title": "Stat target",
       "description": "Which EffectiveStats field this mod feeds.",
-      "enum": [
-        "str", "int", "wis", "agi", "con", "cha",
-        "max_hp", "max_tp", "max_sp", "hp_regen", "tp_regen", "sp_regen",
-        "damage_dealt", "damage_taken", "accuracy", "evasion", "armor",
-        "crit_chance", "crit_damage", "crit_damage_taken", "crit_resistance",
-        "attack_speed", "move_speed",
-        "damage_dealt_fire", "damage_dealt_water", "damage_dealt_earth",
-        "damage_dealt_wind", "damage_dealt_light", "damage_dealt_dark",
-        "damage_taken_fire", "damage_taken_water", "damage_taken_earth",
-        "damage_taken_wind", "damage_taken_light", "damage_taken_dark",
-        "healing_dealt", "healing_received",
-        "xp_gain", "gold_gain", "rep_gain", "drop_chance", "magic_find",
-        "slow_resistance", "poison_resistance", "root_resistance",
-        "status_duration_self", "status_duration_dealt",
-        "cooldown_reduction", "mana_cost_reduction"
+      "x-aio-options": [
+        { "value": "str", "label": "STR" },
+        { "value": "int", "label": "INT" },
+        { "value": "wis", "label": "WIS" },
+        { "value": "agi", "label": "AGI" },
+        { "value": "con", "label": "CON" },
+        { "value": "cha", "label": "CHA" },
+        { "value": "max_hp", "label": "Max HP" },
+        { "value": "max_tp", "label": "Max TP" },
+        { "value": "max_sp", "label": "Max SP" },
+        { "value": "hp_regen", "label": "HP regen" },
+        { "value": "tp_regen", "label": "TP regen" },
+        { "value": "sp_regen", "label": "SP regen" },
+        { "value": "damage_dealt", "label": "Damage dealt (×)" },
+        { "value": "damage_taken", "label": "Damage taken (×)" },
+        { "value": "accuracy", "label": "Accuracy" },
+        { "value": "evasion", "label": "Evasion" },
+        { "value": "armor", "label": "Armor" },
+        { "value": "crit_chance", "label": "Crit chance" },
+        { "value": "crit_damage", "label": "Crit damage (×)" },
+        { "value": "crit_damage_taken", "label": "Crit damage taken (×)" },
+        { "value": "crit_resistance", "label": "Crit resistance" },
+        { "value": "attack_speed", "label": "Attack speed (×)" },
+        { "value": "move_speed", "label": "Move speed (×)" },
+        { "value": "damage_dealt_fire", "label": "Damage dealt: fire (×)" },
+        { "value": "damage_dealt_water", "label": "Damage dealt: water (×)" },
+        { "value": "damage_dealt_earth", "label": "Damage dealt: earth (×)" },
+        { "value": "damage_dealt_wind", "label": "Damage dealt: wind (×)" },
+        { "value": "damage_dealt_light", "label": "Damage dealt: light (×)" },
+        { "value": "damage_dealt_dark", "label": "Damage dealt: dark (×)" },
+        { "value": "damage_taken_fire", "label": "Damage taken: fire (×)" },
+        { "value": "damage_taken_water", "label": "Damage taken: water (×)" },
+        { "value": "damage_taken_earth", "label": "Damage taken: earth (×)" },
+        { "value": "damage_taken_wind", "label": "Damage taken: wind (×)" },
+        { "value": "damage_taken_light", "label": "Damage taken: light (×)" },
+        { "value": "damage_taken_dark", "label": "Damage taken: dark (×)" },
+        { "value": "healing_dealt", "label": "Healing dealt (×)" },
+        { "value": "healing_received", "label": "Healing received (×)" },
+        { "value": "xp_gain", "label": "XP gain (×)" },
+        { "value": "gold_gain", "label": "Gold gain (×)" },
+        { "value": "rep_gain", "label": "Rep gain (×)" },
+        { "value": "drop_chance", "label": "Drop chance (×)" },
+        { "value": "magic_find", "label": "Magic find (×)" },
+        { "value": "slow_resistance", "label": "Slow resistance" },
+        { "value": "poison_resistance", "label": "Poison resistance" },
+        { "value": "root_resistance", "label": "Root resistance" },
+        { "value": "status_duration_self", "label": "Status duration on self (×)" },
+        { "value": "status_duration_dealt", "label": "Status duration dealt (×)" },
+        { "value": "cooldown_reduction", "label": "Cooldown reduction" },
+        { "value": "mana_cost_reduction", "label": "Mana cost reduction" }
       ]
     },
     "kind": {
       "type": "string",
       "title": "Stacking bucket",
-      "description": "Effect engine stacking bucket. flat adds to the base; percent_additive sums with other additive mods; percent_multiplicative compounds with other multiplicative mods.",
-      "enum": ["flat", "percent_additive", "percent_multiplicative"]
+      "description": "Effect engine stacking bucket. Flat adds to the base; percent-additive sums with other additive mods; percent-multiplicative compounds with other multiplicative mods.",
+      "x-aio-options": [
+        { "value": "flat", "label": "Flat (adds to base)" },
+        { "value": "percent_additive", "label": "Percent (additive — sums with other %add)" },
+        { "value": "percent_multiplicative", "label": "Percent (multiplicative — compounds)" }
+      ]
     },
     "low": {
       "type": "number",
@@ -66,7 +105,12 @@
       "description": "Which item rarities can roll this mod. At least one required.",
       "items": {
         "type": "string",
-        "enum": ["common", "rare", "epic", "legendary"]
+        "x-aio-options": [
+          { "value": "common", "label": "Common" },
+          { "value": "rare", "label": "Rare" },
+          { "value": "epic", "label": "Epic" },
+          { "value": "legendary", "label": "Legendary" }
+        ]
       },
       "minItems": 1,
       "uniqueItems": true
@@ -74,7 +118,7 @@
     "when": {
       "type": "object",
       "title": "Optional condition (raw JSON)",
-      "description": "Effect-engine Condition that gates when this mod's bonus applies. Hand-edit JSON for now — discriminated-union form rendering is a follow-on slice. Example: {\"type\":\"self_hp_below_pct\",\"pct\":30}"
+      "description": "Effect-engine Condition that gates when this mod's bonus applies. Leave absent if unused — saving an empty {} object here will cause the server to reject the modifier on next reload. Hand-edit JSON for valid Conditions until the discriminated-union form lands. Example: {\"type\":\"self_hp_below_pct\",\"pct\":30}"
     }
   }
 }
