@@ -53,6 +53,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
   const [types, setTypes] = useState<PubType[] | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [files, setFiles] = useState<PubFile[] | null>(null);
+  const [fileSearch, setFileSearch] = useState("");
   const [selection, setSelection] = useState<PubSelection | null>(null);
   const [fileContent, setFileContent] = useState<PubFileContent | null>(null);
   const [draft, setDraft] = useState<string>("");
@@ -117,6 +118,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
     const ctrl = new AbortController();
     setError(null);
     setFiles(null);
+    setFileSearch("");
     fetchPubFiles(selectedType, token, ctrl.signal)
       .then((f) => {
         if (!ctrl.signal.aborted) setFiles(f);
@@ -127,6 +129,21 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
       });
     return () => ctrl.abort();
   }, [selectedType, token, handleApiError]);
+
+  // Case-insensitive substring filter over the leading numeric ID and the
+  // display name. Both are checked so "0014" finds the file directly and
+  // "drag" finds anything named "Dragon Slayer".
+  const visibleFiles = useMemo(() => {
+    if (!files) return null;
+    const q = fileSearch.trim().toLowerCase();
+    if (!q) return files;
+    return files.filter((f) => {
+      const idStr = f.filename.replace(/\.json$/, "").toLowerCase();
+      if (idStr.includes(q)) return true;
+      if (f.name && f.name.toLowerCase().includes(q)) return true;
+      return false;
+    });
+  }, [files, fileSearch]);
 
   useEffect(() => {
     if (selection === null) {
@@ -423,7 +440,11 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
       <aside className="flex min-h-0 flex-col border-r border-slate-800 bg-slate-950/20">
         <div className="flex items-center justify-between border-b border-slate-800/60 px-3 py-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Files {files && `(${files.length})`}
+            Files{" "}
+            {files &&
+              (fileSearch && visibleFiles
+                ? `(${visibleFiles.length}/${files.length})`
+                : `(${files.length})`)}
           </h2>
           {canCreateNew && (
             <button
@@ -436,6 +457,29 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
             </button>
           )}
         </div>
+        {selectedType !== null && files !== null && files.length > 0 && (
+          <div className="border-b border-slate-800/40 px-2 py-1.5">
+            <div className="relative">
+              <input
+                type="search"
+                value={fileSearch}
+                onChange={(e) => setFileSearch(e.currentTarget.value)}
+                placeholder="Search by name or ID…"
+                className="w-full rounded border border-slate-700 bg-slate-900/60 px-2 py-1 pr-7 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
+              />
+              {fileSearch && (
+                <button
+                  onClick={() => setFileSearch("")}
+                  className="-translate-y-1/2 absolute top-1/2 right-1 rounded px-1 text-slate-400 hover:text-slate-200"
+                  title="clear search"
+                  type="button"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
           {selectedType === null ? (
             <p className="px-2 py-1 text-sm text-slate-500">pick a pub type</p>
@@ -443,9 +487,13 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
             <p className="px-2 py-1 text-sm text-slate-500">loading…</p>
           ) : files.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">no files</p>
+          ) : visibleFiles && visibleFiles.length === 0 ? (
+            <p className="px-2 py-1 text-sm text-slate-500">
+              no files match “{fileSearch}”
+            </p>
           ) : (
             <ul className="space-y-0.5">
-              {files.map((f) => {
+              {(visibleFiles ?? files).map((f) => {
                 const selected = selection?.filename === f.filename;
                 return (
                   <li key={f.filename}>
