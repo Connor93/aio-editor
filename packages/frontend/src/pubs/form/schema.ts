@@ -26,6 +26,7 @@ export interface JsonSchema {
   maximum?: number;
   minLength?: number;
   enum?: (string | number)[];
+  default?: unknown;
   description?: string;
   title?: string;
   /** AIO Editor extension. Ignored by Ajv (we run with strict: false). */
@@ -105,12 +106,32 @@ export function resolveRef(
  *  rather than always returning the literal zero value for the type. */
 export function makeDefault(schema: JsonSchema, rootSchema: JsonSchema): unknown {
   const resolved = resolveRef(schema, rootSchema);
+  // An explicit `default` at this node wins over the type-driven fallback.
+  // Object schemas keep the recursive path because their default-included
+  // children aren't all expressible as a single literal — see the object
+  // case below.
+  if (
+    resolved.type !== "object" &&
+    Object.prototype.hasOwnProperty.call(resolved, "default")
+  ) {
+    return resolved.default;
+  }
   switch (resolved.type) {
     case "object": {
       const obj: Record<string, unknown> = {};
       const required = resolved.required ?? [];
       const properties = resolved.properties ?? {};
-      for (const key of required) {
+      // Required keys must be present for the document to validate. Keys
+      // with an explicit `default` get pre-filled so designers don't
+      // have to remember every necessary field — the schema author has
+      // already declared a sensible starting value.
+      const include = new Set<string>(required);
+      for (const [key, child] of Object.entries(properties)) {
+        if (Object.prototype.hasOwnProperty.call(child, "default")) {
+          include.add(key);
+        }
+      }
+      for (const key of include) {
         const childSchema = properties[key];
         if (childSchema) {
           obj[key] = makeDefault(childSchema, rootSchema);
