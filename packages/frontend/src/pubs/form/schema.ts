@@ -25,6 +25,7 @@ export interface JsonSchema {
   minimum?: number;
   maximum?: number;
   minLength?: number;
+  enum?: (string | number)[];
   description?: string;
   title?: string;
   /** AIO Editor extension. Ignored by Ajv (we run with strict: false). */
@@ -98,7 +99,10 @@ export function resolveRef(
 }
 
 /** Best-effort default value for a schema when the user adds a new array
- *  item or dict entry. Matches the leaves to sensible zero values. */
+ *  item or dict entry — or when "+ new" builds a starting skeleton for a
+ *  whole pub file. The values it produces have to pass schema validation
+ *  on the way to staging, so we honor `minLength` / `enum` / `minimum`
+ *  rather than always returning the literal zero value for the type. */
 export function makeDefault(schema: JsonSchema, rootSchema: JsonSchema): unknown {
   const resolved = resolveRef(schema, rootSchema);
   switch (resolved.type) {
@@ -116,10 +120,22 @@ export function makeDefault(schema: JsonSchema, rootSchema: JsonSchema): unknown
     }
     case "array":
       return [];
-    case "string":
+    case "string": {
+      if (Array.isArray(resolved.enum) && resolved.enum.length > 0) {
+        return resolved.enum[0];
+      }
+      // Schemas like `name: { type: "string", minLength: 1 }` reject the
+      // empty string — supply a placeholder the user can edit instead.
+      if (typeof resolved.minLength === "number" && resolved.minLength > 0) {
+        return "untitled";
+      }
       return "";
+    }
     case "integer":
     case "number":
+      if (Array.isArray(resolved.enum) && resolved.enum.length > 0) {
+        return resolved.enum[0];
+      }
       if (typeof resolved.minimum === "number") return resolved.minimum;
       return 0;
     case "boolean":
