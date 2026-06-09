@@ -27,7 +27,7 @@
     },
     {
       "label": "Element",
-      "fields": ["element", "element_damage"]
+      "fields": ["element", "element_damage", "element_roll_table"]
     },
     {
       "label": "Resistances",
@@ -149,6 +149,24 @@
       ]
     },
     "element_damage": { "type": "integer", "minimum": 0 },
+    "element_roll_table": {
+      "type": "array",
+      "title": "Element roll table",
+      "description": "Weighted distribution of elements this weapon may roll at instance creation. Leave empty for Plain.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["element", "weight"],
+        "properties": {
+          "element": {
+            "type": "string",
+            "enum": ["plain", "fire", "water", "earth", "wind", "light", "dark"]
+          },
+          "weight": { "type": "integer", "minimum": 1, "default": 1 }
+        }
+      },
+      "default": []
+    },
     "weight": { "type": "integer", "minimum": 0 },
     "size": {
       "type": "integer",
