@@ -137,7 +137,7 @@
     "element": {
       "type": "integer",
       "minimum": 0,
-      "description": "Element enum (eolib).",
+      "description": "DEPRECATED. Use element_roll_table on weapons instead — the rolled instance's element overrides this field, which is no longer read by combat. Kept for legacy data only.",
       "x-aio-options": [
         { "value": 0, "label": "None" },
         { "value": 1, "label": "Light" },
@@ -148,7 +148,11 @@
         { "value": 6, "label": "Fire" }
       ]
     },
-    "element_damage": { "type": "integer", "minimum": 0 },
+    "element_damage": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "DEPRECATED. Was used by the original split-damage design; the new model has the entire swing be the rolled element. No combat code reads this field. Use element_roll_table instead."
+    },
     "element_roll_table": {
       "type": "array",
       "title": "Element roll table",
