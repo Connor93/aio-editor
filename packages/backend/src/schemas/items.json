@@ -160,7 +160,16 @@
         "properties": {
           "element": {
             "type": "string",
-            "enum": ["plain", "fire", "water", "earth", "wind", "light", "dark"]
+            "enum": ["plain", "fire", "water", "earth", "wind", "light", "dark"],
+            "x-aio-options": [
+              { "value": "plain", "label": "Plain" },
+              { "value": "fire", "label": "Fire" },
+              { "value": "water", "label": "Water" },
+              { "value": "earth", "label": "Earth" },
+              { "value": "wind", "label": "Wind" },
+              { "value": "light", "label": "Light" },
+              { "value": "dark", "label": "Dark" }
+            ]
           },
           "weight": { "type": "integer", "minimum": 1, "default": 1 }
         }
