@@ -1,10 +1,11 @@
 import { useState } from "react";
 
+import { MapUploader } from "./maps/MapUploader";
 import { PubBrowser } from "./pubs/PubBrowser";
 import { RefsProvider } from "./pubs/refs/RefsContext";
 import { RollSimulator } from "./rolls/RollSimulator";
 
-type View = "pubs" | "rolls";
+type View = "pubs" | "rolls" | "maps";
 
 interface AppShellProps {
   token: string;
@@ -31,6 +32,11 @@ export function AppShell({ token, expiresAt, onLogout }: AppShellProps) {
               onClick={() => setView("rolls")}
               label="Roll simulator"
             />
+            <NavTab
+              active={view === "maps"}
+              onClick={() => setView("maps")}
+              label="Maps"
+            />
           </nav>
         </div>
         <div className="flex items-center gap-4 text-sm">
@@ -53,8 +59,10 @@ export function AppShell({ token, expiresAt, onLogout }: AppShellProps) {
           <RefsProvider token={token} onUnauthorized={onLogout}>
             <PubBrowser token={token} onUnauthorized={onLogout} />
           </RefsProvider>
-        ) : (
+        ) : view === "rolls" ? (
           <RollSimulator token={token} onUnauthorized={onLogout} />
+        ) : (
+          <MapUploader token={token} onUnauthorized={onLogout} />
         )}
       </main>
     </div>
