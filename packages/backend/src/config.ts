@@ -15,6 +15,9 @@ const pubDataDir = resolve(requireEnv("PUB_DATA_DIR"));
 const gfxRoot = process.env.GFX_ROOT?.trim()
   ? resolve(process.env.GFX_ROOT.trim())
   : null;
+const mapsDataDir = process.env.MAPS_DATA_DIR?.trim()
+  ? resolve(process.env.MAPS_DATA_DIR.trim())
+  : null;
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
@@ -23,4 +26,5 @@ export const config = {
   pubDataDir,
   stagingDir: resolve(pubDataDir, ".staging"),
   gfxRoot,
+  mapsDataDir,
 };
