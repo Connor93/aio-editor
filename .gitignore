@@ -7,6 +7,7 @@ build/
 .env
 .env.local
 .env.*.local
+.env.deploy
 
 # Prisma generated client (regenerated on install)
 packages/backend/prisma/generated/
