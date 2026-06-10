@@ -37,6 +37,30 @@ echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 docker push "$BACKEND_IMAGE"
 docker push "$FRONTEND_IMAGE"
 
+# ── GFX preview assets (one-time seed of the origin-gfx volume) ──
+# The editor serves preview PNGs from GFX_ROOT/gfxNNN/<resource_id>.png.
+# Set GFX_SRC in .env.deploy (path to reoserv/data/gfx) to upload the four
+# needed dirs (~30M) into origin-gfx once. Skipped if already populated.
+if [[ -n "${GFX_SRC:-}" ]]; then
+  if [[ ! -d "$GFX_SRC/gfx023" ]]; then
+    echo "⚠️  GFX_SRC=$GFX_SRC has no gfx023/ — skipping GFX seed (check the path)"
+  else
+    GFX_STATE=$(ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
+      "docker run --rm -v origin-gfx:/v alpine sh -c '[ -d /v/gfx023 ] && echo filled || echo empty'")
+    if [[ "$GFX_STATE" == "empty" ]]; then
+      echo "🎨 Seeding origin-gfx from $GFX_SRC (one-time, ~30M) ..."
+      tar -C "$GFX_SRC" -czf /tmp/origin-gfx.tgz gfx021 gfx023 gfx024 gfx025
+      scp -P "$SSH_PORT" /tmp/origin-gfx.tgz "${VPS_USER}@${VPS_HOST}:/tmp/origin-gfx.tgz"
+      ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
+        "docker run --rm -v origin-gfx:/v -v /tmp/origin-gfx.tgz:/seed.tgz:ro alpine sh -c 'tar -xzf /seed.tgz -C /v' && rm -f /tmp/origin-gfx.tgz"
+      rm -f /tmp/origin-gfx.tgz
+      echo "🎨 origin-gfx seeded."
+    else
+      echo "🎨 origin-gfx already populated — skipping seed (clear the volume to re-seed)."
+    fi
+  fi
+fi
+
 ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" bash -s -- \
   "$FRONTEND_IMAGE" "$BACKEND_IMAGE" "$GHCR_USER" "$GHCR_PAT" "$EDITOR_DOMAIN" <<'REMOTE'
 set -euo pipefail
@@ -94,8 +118,9 @@ TRAEFIK
 
 # Compose: backend on web (api route) + origin (reoserv admin); shared pub
 # volume. HOST=0.0.0.0 is REQUIRED — the backend defaults to 127.0.0.1 and
-# would be unreachable from Traefik otherwise. GFX_ROOT left unset (previews
-# 503 until origin-gfx is populated; the editor works without them).
+# would be unreachable from Traefik otherwise. GFX_ROOT serves preview
+# thumbnails from the read-only origin-gfx volume (404s gracefully if the
+# volume wasn't seeded — set GFX_SRC in .env.deploy to seed it).
 mkdir -p ~/aio-editor
 cat > ~/aio-editor/docker-compose.yml <<COMPOSE
 services:
@@ -107,9 +132,11 @@ services:
       - HOST=0.0.0.0
       - PORT=4000
       - PUB_DATA_DIR=/data/pub
+      - GFX_ROOT=/data/gfx
       - REOSERV_BASE_URL=http://reoserv:8090
     volumes:
       - origin-pub:/data/pub
+      - origin-gfx:/data/gfx:ro
     networks:
       - web
       - origin
@@ -121,6 +148,8 @@ services:
       - web
 volumes:
   origin-pub:
+    external: true
+  origin-gfx:
     external: true
 networks:
   web:
