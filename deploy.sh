@@ -133,10 +133,12 @@ services:
       - PORT=4000
       - PUB_DATA_DIR=/data/pub
       - GFX_ROOT=/data/gfx
+      - MAPS_DATA_DIR=/data/maps
       - REOSERV_BASE_URL=http://reoserv:8090
     volumes:
       - origin-pub:/data/pub
       - origin-gfx:/data/gfx:ro
+      - origin-maps:/data/maps
     networks:
       - web
       - origin
@@ -150,6 +152,8 @@ volumes:
   origin-pub:
     external: true
   origin-gfx:
+    external: true
+  origin-maps:
     external: true
 networks:
   web:
