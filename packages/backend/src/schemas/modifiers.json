@@ -14,16 +14,19 @@
   "properties": {
     "mod_id": {
       "type": "string",
+      "minLength": 1,
       "title": "Mod ID",
       "description": "Stable identifier referenced in rolled item instances. Use snake_case. Never rename — change cascades through every existing rolled item."
     },
     "name": {
       "type": "string",
+      "minLength": 1,
       "title": "Display name",
       "description": "Player-facing name shown in item descriptions on rolled items (e.g. 'Burning', 'Of Fire'). Separate from mod_id so designers can rename for clarity without breaking existing rolled instances."
     },
     "target": {
       "type": "string",
+      "default": "str",
       "title": "Stat target",
       "description": "Which EffectiveStats field this mod feeds.",
       "x-aio-options": [
@@ -80,6 +83,7 @@
     },
     "kind": {
       "type": "string",
+      "default": "flat",
       "title": "Stacking bucket",
       "description": "Effect engine stacking bucket. Flat adds to the base; percent-additive sums with other additive mods; percent-multiplicative compounds with other multiplicative mods.",
       "x-aio-options": [
@@ -118,6 +122,7 @@
         ]
       },
       "minItems": 1,
+      "default": ["common", "rare", "epic", "legendary"],
       "uniqueItems": true
     },
     "item_types": {
@@ -133,6 +138,7 @@
         ]
       },
       "minItems": 1,
+      "default": ["weapon", "armor", "accessory"],
       "uniqueItems": true
     },
     "when": {
