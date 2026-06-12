@@ -18,7 +18,7 @@
     },
     {
       "label": "Combat",
-      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage", "attack_rate_ms", "move_rate_delta_ms"]
+      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage", "attack_rate_ms"]
     },
     {
       "label": "Character Stats",
@@ -107,10 +107,6 @@
       "type": "integer",
       "minimum": 1,
       "description": "Weapons only: absolute swing interval in ms (dagger ~400, greatsword ~900). Omit to inherit the wielder's class unarmed rate."
-    },
-    "move_rate_delta_ms": {
-      "type": "integer",
-      "description": "Move-rate delta in ms while equipped (positive = slower, e.g. heavy plate +60)."
     },
     "str": { "type": "integer" },
     "intl": { "type": "integer" },
