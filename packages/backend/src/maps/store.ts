@@ -1,11 +1,14 @@
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { config } from "../config.js";
 
 /** Client-correctable problems (bad magic, bad id). Mapped to 400 by the route. */
 export class InvalidMapError extends Error {}
+
+/** Map id is valid but no file exists on disk. Mapped to 404 by the route. */
+export class MapNotFoundError extends Error {}
 
 const MIN_MAP_ID = 1;
 const MAX_MAP_ID = 32000;
@@ -89,4 +92,15 @@ export async function listMapIds(): Promise<number[]> {
     if (m) ids.add(Number(m[1]));
   }
   return [...ids].sort((a, b) => a - b);
+}
+
+/** Read a map's raw .emf bytes by id. Throws MapNotFoundError (→404) when the
+ *  canonical {id:05}.emf doesn't exist. */
+export async function readMap(id: number): Promise<Buffer> {
+  const dir = mapsDir();
+  const path = join(dir, paddedMapName(id));
+  if (!existsSync(path)) {
+    throw new MapNotFoundError(`map ${id} not found`);
+  }
+  return readFile(path);
 }
