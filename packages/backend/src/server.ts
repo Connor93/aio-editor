@@ -8,6 +8,7 @@ import { registerAuthRoutes } from "./routes/auth.js";
 import { registerGfxRoutes } from "./routes/gfx.js";
 import { registerMapRoutes } from "./routes/maps.js";
 import { registerPubRoutes } from "./routes/pubs.js";
+import { registerMapperRoutes } from "./routes/mapper.js";
 import { registerSimulateRollRoutes } from "./routes/simulate_roll.js";
 import { registerStagingRoutes } from "./routes/staging.js";
 
@@ -45,6 +46,7 @@ async function main() {
   await registerGfxRoutes(app);
   await registerSimulateRollRoutes(app);
   await registerMapRoutes(app);
+  await registerMapperRoutes(app);
 
   try {
     await app.listen({ port: config.port, host: config.host });
