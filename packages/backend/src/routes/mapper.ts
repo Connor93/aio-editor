@@ -16,12 +16,19 @@ function contentTypeFor(path: string): string {
 }
 
 /** Weak validator cache headers + a strong ETag from size+mtime. Returns true
- *  if the request's If-None-Match matched (caller should 304). */
+ *  if the request's If-None-Match matched (caller should 304). 1-day cache —
+ *  EGF/asset filenames are stable, so repeat loads are instant. */
 function applyCacheHeaders(reply: FastifyReply, ifNoneMatch: string | undefined, stats: Stats): boolean {
   const etag = `"${stats.size.toString(16)}-${Math.trunc(stats.mtimeMs).toString(16)}"`;
   reply.header("ETag", etag);
-  reply.header("Cache-Control", "public, max-age=3600");
+  reply.header("Cache-Control", "public, max-age=86400");
   return ifNoneMatch === etag;
+}
+
+/** True if the client's Accept-Encoding advertises brotli. */
+function acceptsBrotli(header: string | undefined): boolean {
+  if (!header) return false;
+  return header.split(",").some((part) => (part.trim().split(";")[0] ?? "").toLowerCase() === "br");
 }
 
 export async function registerMapperRoutes(app: FastifyInstance) {
@@ -36,19 +43,35 @@ export async function registerMapperRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "invalid egf filename" });
     }
     const root = resolvePath(config.gfxRoot);
-    const path = resolvePath(root, file);
-    if (!path.startsWith(root + "/")) {
+    const rawPath = resolvePath(root, file);
+    if (!rawPath.startsWith(root + "/")) {
       return reply.code(400).send({ error: "path escapes gfx root" });
     }
-    if (!existsSync(path)) {
+
+    // Prefer a brotli-precompressed `<file>.br` sibling when the client accepts
+    // it (see scripts/compress-egf.sh). The browser decompresses transparently,
+    // so eomap-js's loader never sees the compression. Falls back to raw .egf.
+    const brPath = `${rawPath}.br`;
+    let servePath = rawPath;
+    let contentEncoding: string | undefined;
+    if (acceptsBrotli(request.headers["accept-encoding"]) && existsSync(brPath)) {
+      servePath = brPath;
+      contentEncoding = "br";
+    }
+    if (!existsSync(servePath)) {
       return reply.code(404).send({ error: "egf not found" });
     }
-    const stats = statSync(path);
+
+    const stats = statSync(servePath);
+    reply.header("Vary", "Accept-Encoding");
     if (applyCacheHeaders(reply, request.headers["if-none-match"], stats)) {
       return reply.code(304).send();
     }
+    if (contentEncoding) {
+      reply.header("Content-Encoding", contentEncoding);
+    }
     reply.header("Content-Type", "application/octet-stream");
-    return reply.send(createReadStream(path));
+    return reply.send(createReadStream(servePath));
   });
 
   // Bundled mapper assets (cursor/black/grid/specs/entities). PUBLIC.

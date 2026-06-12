@@ -64,25 +64,29 @@ if [[ -n "${GFX_SRC:-}" ]]; then
   fi
 fi
 
-# ── Map EGF files (one-time seed for the embedded map editor) ──
+# ── Map EGF files + brotli precompression (one-time seed for the editor) ──
 # eomap-js connected mode needs gfx003/004/005/006/007/022.egf in origin-gfx.
-# The PNG seed above only ships the gfxNNN/ preview dirs, so seed the .egf
-# files separately. Idempotent: keyed on gfx003.egf already being present.
+# We also ship .egf.br siblings so the backend serves them with
+# Content-Encoding: br (~108MB -> ~5MB first-load transfer; the loader is
+# untouched — the browser decompresses transparently). The PNG seed above only
+# ships the gfxNNN/ preview dirs. Idempotent: keyed on gfx003.egf.br present.
 if [[ -n "${GFX_SRC:-}" ]]; then
   if [[ ! -f "$GFX_SRC/gfx003.egf" ]]; then
     echo "⚠️  GFX_SRC=$GFX_SRC has no gfx003.egf — skipping map EGF seed"
   else
     EGF_STATE=$(ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
-      "docker run --rm -v origin-gfx:/v alpine sh -c '[ -f /v/gfx003.egf ] && echo filled || echo empty'")
+      "docker run --rm -v origin-gfx:/v alpine sh -c '[ -f /v/gfx003.egf.br ] && echo filled || echo empty'")
     if [[ "$EGF_STATE" == "empty" ]]; then
-      echo "🗺️  Seeding map EGFs into origin-gfx ..."
+      echo "🗺️  Seeding map EGFs (+ brotli) into origin-gfx ..."
+      "$SCRIPT_DIR/scripts/compress-egf.sh" "$GFX_SRC"
       tar -C "$GFX_SRC" -czf /tmp/origin-egf.tgz \
-        gfx003.egf gfx004.egf gfx005.egf gfx006.egf gfx007.egf gfx022.egf
+        gfx003.egf gfx004.egf gfx005.egf gfx006.egf gfx007.egf gfx022.egf \
+        gfx003.egf.br gfx004.egf.br gfx005.egf.br gfx006.egf.br gfx007.egf.br gfx022.egf.br
       scp -P "$SSH_PORT" /tmp/origin-egf.tgz "${VPS_USER}@${VPS_HOST}:/tmp/origin-egf.tgz"
       ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
         "docker run --rm -v origin-gfx:/v -v /tmp/origin-egf.tgz:/seed.tgz:ro alpine sh -c 'tar -xzf /seed.tgz -C /v' && rm -f /tmp/origin-egf.tgz"
       rm -f /tmp/origin-egf.tgz
-      echo "🗺️  Map EGFs seeded."
+      echo "🗺️  Map EGFs + .br seeded."
     else
       echo "🗺️  Map EGFs already present in origin-gfx — skipping."
     fi
