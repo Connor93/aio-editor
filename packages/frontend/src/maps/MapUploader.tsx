@@ -58,8 +58,8 @@ export function MapUploader({ token, onUnauthorized }: MapUploaderProps) {
       setBanner({
         kind: "ok",
         text: result.reloaded
-          ? `Map ${result.map_id} uploaded — reoserv will hot-reload it.`
-          : `Map ${result.map_id} uploaded — it's a NEW map, so it needs a server restart to load.`,
+          ? `Map ${result.map_id} updated — reoserv hot-reloaded it.`
+          : `Map ${result.map_id} created — reoserv hot-loaded the new map.`,
       });
       refreshIds();
     } catch (err) {
@@ -79,9 +79,9 @@ export function MapUploader({ token, onUnauthorized }: MapUploaderProps) {
       <div className="mx-auto max-w-xl space-y-5">
         <h2 className="text-lg font-semibold">Upload a map</h2>
         <p className="text-sm text-slate-400">
-          Pick a <code>.emf</code> file and the map id it targets. Existing maps
-          hot-reload on the live server immediately; a brand-new map id needs a
-          server restart to load.
+          Pick a <code>.emf</code> file and the map id it targets. reoserv
+          hot-loads the map on the live server immediately — existing maps
+          reload and brand-new map ids load without a restart.
         </p>
 
         <div className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">

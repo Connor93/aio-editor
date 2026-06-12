@@ -332,6 +332,8 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
       const filename = nextAvailableId(filesAtStart);
       const body = JSON.stringify(skeleton, null, 2);
       await savePubFile(requestedType, filename, body, token);
+      // Staging is type-agnostic — refresh it regardless of where the user is now.
+      await refreshStaging();
       if (selectedType !== requestedType) {
         // The user moved on while the create was in flight — don't smear
         // sidebar/selection state onto a different type.
@@ -380,6 +382,9 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
           )
         );
       }
+      // Reflect the new staged file in the Staging panel immediately, without a
+      // manual page refresh.
+      await refreshStaging();
     } catch (err) {
       handleApiError(err, "save failed");
     } finally {

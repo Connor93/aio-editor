@@ -1,5 +1,8 @@
 import "dotenv/config";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const moduleDir = dirname(fileURLToPath(import.meta.url));
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -18,6 +21,9 @@ const gfxRoot = process.env.GFX_ROOT?.trim()
 const mapsDataDir = process.env.MAPS_DATA_DIR?.trim()
   ? resolve(process.env.MAPS_DATA_DIR.trim())
   : null;
+const mapperAssetsDir = process.env.MAPPER_ASSETS_DIR?.trim()
+  ? resolve(process.env.MAPPER_ASSETS_DIR.trim())
+  : resolve(moduleDir, "assets/mapper");
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
@@ -27,4 +33,5 @@ export const config = {
   stagingDir: resolve(pubDataDir, ".staging"),
   gfxRoot,
   mapsDataDir,
+  mapperAssetsDir,
 };
