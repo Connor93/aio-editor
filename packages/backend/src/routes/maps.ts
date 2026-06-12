@@ -5,7 +5,7 @@ import {
   InvalidMapError,
   MapNotFoundError,
   clampMapId,
-  listMapIds,
+  listMaps,
   paddedMapName,
   readMap,
   writeMap,
@@ -33,13 +33,14 @@ function mapError(reply: FastifyReply, err: unknown) {
 }
 
 export async function registerMapRoutes(app: FastifyInstance) {
-  // List the map ids currently on disk.
+  // List the maps currently on disk, with names from each EMF header. `ids` is
+  // kept for the Maps-upload tab's back-compat; `maps` carries `{ id, name }`.
   app.get("/api/maps", async (_request, reply) => {
     if (!config.mapsDataDir) {
       return reply.code(503).send({ error: "MAPS_DATA_DIR not configured on the backend" });
     }
-    const ids = await listMapIds();
-    return { ids };
+    const maps = await listMaps();
+    return { ids: maps.map((m) => m.id), maps };
   });
 
   // Download a single map's raw .emf bytes. Used by the embedded editor's
