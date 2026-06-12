@@ -30,3 +30,6 @@ npm-debug.log*
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# eomap-js fork bundle, copied in at build time (see scripts/build-eomap.sh)
+packages/frontend/public/eomap/
