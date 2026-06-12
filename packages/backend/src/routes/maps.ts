@@ -1,13 +1,24 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 
 import { config } from "../config.js";
-import { InvalidMapError, clampMapId, listMapIds, writeMap } from "../maps/store.js";
+import {
+  InvalidMapError,
+  MapNotFoundError,
+  clampMapId,
+  listMapIds,
+  paddedMapName,
+  readMap,
+  writeMap,
+} from "../maps/store.js";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 function mapError(reply: FastifyReply, err: unknown) {
   if (err instanceof InvalidMapError) {
     return reply.code(400).send({ error: err.message });
+  }
+  if (err instanceof MapNotFoundError) {
+    return reply.code(404).send({ error: err.message });
   }
   // @fastify/multipart throws this code when a file exceeds the size limit.
   if (
@@ -29,6 +40,23 @@ export async function registerMapRoutes(app: FastifyInstance) {
     }
     const ids = await listMapIds();
     return { ids };
+  });
+
+  // Download a single map's raw .emf bytes. Used by the embedded editor's
+  // ServerFileSystemProvider to open a map.
+  app.get<{ Params: { id: string } }>("/api/maps/:id", async (request, reply) => {
+    if (!config.mapsDataDir) {
+      return reply.code(503).send({ error: "MAPS_DATA_DIR not configured on the backend" });
+    }
+    try {
+      const id = clampMapId(request.params.id);
+      const buffer = await readMap(id);
+      reply.header("Content-Type", "application/octet-stream");
+      reply.header("Content-Disposition", `attachment; filename="${paddedMapName(id)}"`);
+      return reply.send(buffer);
+    } catch (err) {
+      return mapError(reply, err);
+    }
   });
 
   // Upload a .emf for a given map id. Multipart form: field "map_id" + file "file".
