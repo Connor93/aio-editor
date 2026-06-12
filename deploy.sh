@@ -29,6 +29,9 @@ echo "═══ AIO Editor deploy → $EDITOR_DOMAIN ═══"
 
 echo "📦 Building backend ..."
 docker build --platform linux/amd64 -f packages/backend/Dockerfile -t "$BACKEND_IMAGE" "$SCRIPT_DIR"
+echo "🗺️  Building eomap-js fork bundle ..."
+EOMAP_FORK_DIR="${EOMAP_FORK_DIR:-$HOME/Projects/eomap-js-origin}" "$SCRIPT_DIR/scripts/build-eomap.sh"
+
 echo "📦 Building frontend ..."
 docker build --platform linux/amd64 -f packages/frontend/Dockerfile -t "$FRONTEND_IMAGE" "$SCRIPT_DIR"
 
@@ -57,6 +60,31 @@ if [[ -n "${GFX_SRC:-}" ]]; then
       echo "🎨 origin-gfx seeded."
     else
       echo "🎨 origin-gfx already populated — skipping seed (clear the volume to re-seed)."
+    fi
+  fi
+fi
+
+# ── Map EGF files (one-time seed for the embedded map editor) ──
+# eomap-js connected mode needs gfx003/004/005/006/007/022.egf in origin-gfx.
+# The PNG seed above only ships the gfxNNN/ preview dirs, so seed the .egf
+# files separately. Idempotent: keyed on gfx003.egf already being present.
+if [[ -n "${GFX_SRC:-}" ]]; then
+  if [[ ! -f "$GFX_SRC/gfx003.egf" ]]; then
+    echo "⚠️  GFX_SRC=$GFX_SRC has no gfx003.egf — skipping map EGF seed"
+  else
+    EGF_STATE=$(ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
+      "docker run --rm -v origin-gfx:/v alpine sh -c '[ -f /v/gfx003.egf ] && echo filled || echo empty'")
+    if [[ "$EGF_STATE" == "empty" ]]; then
+      echo "🗺️  Seeding map EGFs into origin-gfx ..."
+      tar -C "$GFX_SRC" -czf /tmp/origin-egf.tgz \
+        gfx003.egf gfx004.egf gfx005.egf gfx006.egf gfx007.egf gfx022.egf
+      scp -P "$SSH_PORT" /tmp/origin-egf.tgz "${VPS_USER}@${VPS_HOST}:/tmp/origin-egf.tgz"
+      ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
+        "docker run --rm -v origin-gfx:/v -v /tmp/origin-egf.tgz:/seed.tgz:ro alpine sh -c 'tar -xzf /seed.tgz -C /v' && rm -f /tmp/origin-egf.tgz"
+      rm -f /tmp/origin-egf.tgz
+      echo "🗺️  Map EGFs seeded."
+    else
+      echo "🗺️  Map EGFs already present in origin-gfx — skipping."
     fi
   fi
 fi
