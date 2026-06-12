@@ -27,6 +27,18 @@
     "wis": { "type": "integer", "minimum": 0 },
     "agi": { "type": "integer", "minimum": 0 },
     "con": { "type": "integer", "minimum": 0 },
-    "cha": { "type": "integer", "minimum": 0 }
+    "cha": { "type": "integer", "minimum": 0 },
+    "unarmed_attack_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 600,
+      "description": "Swing interval (ms) with no weapon, or with a weapon that doesn't author attack_rate_ms. Lower = faster."
+    },
+    "move_rate_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 480,
+      "description": "Base interval (ms) between steps for this class. Lower = faster."
+    }
   }
 }
