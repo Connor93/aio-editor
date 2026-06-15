@@ -9,6 +9,7 @@ import { registerGfxRoutes } from "./routes/gfx.js";
 import { registerMapRoutes } from "./routes/maps.js";
 import { registerPubRoutes } from "./routes/pubs.js";
 import { registerMapperRoutes } from "./routes/mapper.js";
+import { registerComputeNpcStatsRoutes } from "./routes/compute_npc_stats.js";
 import { registerSimulateRollRoutes } from "./routes/simulate_roll.js";
 import { registerStagingRoutes } from "./routes/staging.js";
 
@@ -40,11 +41,13 @@ async function main() {
   registerAuthGuard(app, "/api/schemas");
   registerAuthGuard(app, "/api/staging");
   registerAuthGuard(app, "/api/simulate_roll");
+  registerAuthGuard(app, "/api/compute_npc_stats");
   registerAuthGuard(app, "/api/maps");
   await registerPubRoutes(app);
   await registerStagingRoutes(app);
   await registerGfxRoutes(app);
   await registerSimulateRollRoutes(app);
+  await registerComputeNpcStatsRoutes(app);
   await registerMapRoutes(app);
   await registerMapperRoutes(app);
 
