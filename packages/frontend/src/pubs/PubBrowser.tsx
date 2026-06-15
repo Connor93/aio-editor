@@ -10,6 +10,7 @@ import {
   fetchSchema,
   savePubFile,
 } from "./api";
+import { ComputedStatsCard } from "./form/ComputedStatsCard";
 import { SchemaForm } from "./form/SchemaForm";
 import { type JsonSchema, makeDefault } from "./form/schema";
 import {
@@ -641,6 +642,15 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                   </div>
                 ) : (
                   <div className="p-4">
+                    {selection?.type === "npcs" &&
+                      parsedDraft.value != null &&
+                      typeof parsedDraft.value === "object" && (
+                        <ComputedStatsCard
+                          npc={parsedDraft.value as Record<string, unknown>}
+                          token={token}
+                          onUnauthorized={onUnauthorized}
+                        />
+                      )}
                     <SchemaForm
                       schema={schema}
                       value={parsedDraft.value}
