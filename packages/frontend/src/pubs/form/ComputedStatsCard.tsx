@@ -90,7 +90,7 @@ export function ComputedStatsCard({
   }, [key, token]);
 
   return (
-    <div className="mb-4 rounded-md border border-slate-800 bg-slate-900/40 p-3">
+    <div className="sticky top-0 z-20 mb-4 rounded-md border border-slate-800 bg-slate-900 p-3 shadow-md shadow-slate-950/60">
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
           Effective stats — what a player faces
