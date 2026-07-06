@@ -47,6 +47,11 @@
       "label": "Stat Requirements",
       "layout": "inline",
       "fields": ["str_requirement", "int_requirement", "wis_requirement", "agi_requirement", "con_requirement", "cha_requirement"]
+    },
+    {
+      "label": "Preset Modifiers",
+      "description": "Guaranteed mods on every rolled instance of this item. Set preset_rarity to fix the tint + slot count; pin any subset via preset_mods (empty slots roll). A fixed value is used verbatim; omit value to roll by level.",
+      "fields": ["preset_rarity", "preset_level", "preset_mods"]
     }
   ],
   "properties": {
@@ -181,6 +186,43 @@
             ]
           },
           "weight": { "type": "integer", "minimum": 1, "default": 1 }
+        }
+      },
+      "default": []
+    },
+    "preset_rarity": {
+      "type": "string",
+      "description": "Optional. Pins the rarity tier (tint + random-mod budget). Leave unset for drops (rarity rolls at drop time).",
+      "enum": ["common", "rare", "epic", "legendary"],
+      "x-aio-options": [
+        { "value": "common", "label": "Common (1 slot)" },
+        { "value": "rare", "label": "Rare (2 slots)" },
+        { "value": "epic", "label": "Epic (3 slots)" },
+        { "value": "legendary", "label": "Legendary (4 slots)" }
+      ]
+    },
+    "preset_level": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional. Pins the item level driving un-valued preset rolls + base-stat scaling. Leave unset to inherit the source (NPC/shop/character)."
+    },
+    "preset_mods": {
+      "type": "array",
+      "title": "Preset mods",
+      "description": "Guaranteed mods. mod_id must match a modifier's mod_id (see the modifiers pubs). Give a value to fix it; omit value to roll by level. Pins bypass tier/category eligibility.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mod_id"],
+        "properties": {
+          "mod_id": {
+            "type": "string",
+            "description": "Modifier id, e.g. fire_dmg, str_bonus (the filename stem of a modifiers pub)."
+          },
+          "value": {
+            "type": "number",
+            "description": "Optional fixed value. Omit to roll from the mod's range at the effective item level."
+          }
         }
       },
       "default": []
