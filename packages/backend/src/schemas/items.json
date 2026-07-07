@@ -217,7 +217,8 @@
         "properties": {
           "mod_id": {
             "type": "string",
-            "description": "Modifier id, e.g. fire_dmg, str_bonus (the filename stem of a modifiers pub)."
+            "description": "The modifier to pin. Pick by name; the stored value is the modifier's id (e.g. fire_dmg).",
+            "x-aio-ref": { "type": "modifiers", "by": "filename-stem" }
           },
           "value": {
             "type": "number",

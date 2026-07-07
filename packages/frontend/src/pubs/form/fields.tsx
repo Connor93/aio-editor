@@ -32,6 +32,9 @@ export function SchemaField(props: CommonProps) {
   }
 
   if (resolved["x-aio-ref"]) {
+    if (resolved["x-aio-ref"].by === "filename-stem") {
+      return <StringReferenceField {...props} schema={resolved} />;
+    }
     return <ReferenceField {...props} schema={resolved} />;
   }
 
@@ -527,6 +530,92 @@ function ReferenceField({
               {o.label} ({o.filename.replace(/\.json$/, "")})
             </option>
           ))}
+      </select>
+    </label>
+  );
+}
+
+/** Cross-pub reference for STRING-keyed pubs (`x-aio-ref` with
+ *  `by: "filename-stem"`). Options come from the referenced pub's file list;
+ *  each option is labelled by the file's `name` field and stores the filename
+ *  stem (e.g. a modifier's `mod_id` like "fire_dmg"). Mirrors ReferenceField
+ *  but for strings — no numeric id, no `noneLabel`/0 sentinel. */
+function StringReferenceField({
+  schema,
+  value,
+  onChange,
+  path,
+  label,
+  required,
+  compact,
+}: CommonProps) {
+  const ref = schema["x-aio-ref"]!;
+  const refType = ref.type;
+  const entry = useRefs(refType);
+
+  const options = useMemo(() => {
+    return entry.files
+      .map((f) => {
+        const stem = f.filename.replace(/\.json$/, "");
+        // Show "Burning (fire_dmg)" — the flavor name leads, the mod_id follows
+        // in parens so it's identifiable at a glance (the names are non-obvious,
+        // e.g. Sharpened = crit_chance). Stored value stays the stem (mod_id).
+        return { stem, label: f.name ? `${f.name} (${stem})` : stem };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [entry.files]);
+
+  const current = typeof value === "string" ? value : null;
+  const matched = current !== null && current !== "" ? options.find((o) => o.stem === current) : null;
+  const unknown =
+    current !== null && current !== "" && entry.status === "loaded" && !matched;
+  const loading = entry.status === "loading";
+
+  const handleSelect = (raw: string) => {
+    if (raw === "") return; // placeholder selection — keep current value
+    onChange(raw);
+  };
+
+  return (
+    <label className={`group/field block ${compact ? "w-32" : ""}`}>
+      <FieldLabel
+        label={label}
+        required={required}
+        description={schema.description}
+        path={path}
+        compact={compact}
+      />
+      <select
+        value={matched ? matched.stem : ""}
+        onChange={(e) => handleSelect(e.target.value)}
+        disabled={loading || entry.status === "error"}
+        className={`${INPUT_BASE} ${unknown ? INPUT_WARN : INPUT_OK} ${compact ? "mt-0.5 w-full" : "w-full"}`}
+        title={
+          unknown ? `Value ${current} not found in ${refType}/` : `→ ${refType}/`
+        }
+      >
+        {loading && (
+          <option value="" disabled>
+            loading {refType}…
+          </option>
+        )}
+        {entry.status === "error" && (
+          <option value="" disabled>
+            error loading {refType}
+          </option>
+        )}
+        {!matched && !loading && entry.status !== "error" && (
+          <option value="" disabled>
+            {unknown
+              ? `(unknown: ${current}) — pick a ${refType}`
+              : `(pick a ${refType})`}
+          </option>
+        )}
+        {options.map((o) => (
+          <option key={o.stem} value={o.stem}>
+            {o.label}
+          </option>
+        ))}
       </select>
     </label>
   );
