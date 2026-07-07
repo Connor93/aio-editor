@@ -16,6 +16,11 @@
       "fields": ["min_level", "max_level", "class_requirement"]
     },
     {
+      "label": "Rarity",
+      "description": "Optional per-shop rarity distribution for this shop's generic (unpinned) instanced stock. Leave the whole object absent → the shop sells Common baseline gear. An item's own preset_rarity pin still wins. Numbers should sum to 1.0.",
+      "fields": ["rarity_weights"]
+    },
+    {
       "label": "Trades",
       "fields": ["trades"]
     },
@@ -38,6 +43,18 @@
       "minimum": 0,
       "description": "Required class id; 0 = any.",
       "x-aio-ref": { "type": "classes", "noneLabel": "(any class)" }
+    },
+    "rarity_weights": {
+      "type": "object",
+      "title": "Rarity weights",
+      "description": "Per-shop rarity distribution for generic instanced stock. Absent → Common. A base item's preset_rarity overrides this. Numbers should sum to 1.0; a partial object is ignored (server falls back to Common).",
+      "required": ["common", "rare", "epic", "legendary"],
+      "properties": {
+        "common": { "type": "number", "title": "Common", "minimum": 0, "maximum": 1, "description": "Probability of a common item (1 mod slot)." },
+        "rare": { "type": "number", "title": "Rare", "minimum": 0, "maximum": 1, "description": "Probability of a rare item (2 mod slots)." },
+        "epic": { "type": "number", "title": "Epic", "minimum": 0, "maximum": 1, "description": "Probability of an epic item (3 mod slots)." },
+        "legendary": { "type": "number", "title": "Legendary", "minimum": 0, "maximum": 1, "description": "Probability of a legendary item (4 mod slots)." }
+      }
     },
     "trades": {
       "type": "array",
