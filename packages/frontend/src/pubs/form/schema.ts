@@ -43,13 +43,19 @@ export interface JsonSchema {
   "x-aio-options"?: Array<{ value: string | number; label: string; description?: string }>;
   /** AIO Editor extension. Declares the field as a cross-pub reference; the
    *  renderer turns the field into a dropdown sourced from the referenced
-   *  pub's file list. Today only `by: "filename-id"` is supported (the
-   *  field's integer value matches the leading numeric portion of a
-   *  filename like `0001.json`). Validation is advisory only — out-of-list
-   *  values render amber but still save, preserving forward-compat. */
+   *  pub's file list. Two key modes:
+   *  - `by: "filename-id"` (default) — the field's integer value matches the
+   *    leading numeric portion of a filename like `0001.json` (items, classes,
+   *    spells). The dropdown stores a number.
+   *  - `by: "filename-stem"` — the field's string value matches the filename
+   *    without `.json` (e.g. modifiers, keyed by `mod_id` like `fire_dmg.json`).
+   *    The dropdown labels each option by the file's `name` field and stores
+   *    the stem string.
+   *  Validation is advisory only — out-of-list values render amber but still
+   *  save, preserving forward-compat. */
   "x-aio-ref"?: {
     type: string;
-    by?: "filename-id";
+    by?: "filename-id" | "filename-stem";
     /** Label to show for value 0 when the field treats 0 as a sentinel for
      *  "none / any". When set, value 0 renders without the unknown-amber
      *  warning even if no `0000.json` exists. */
