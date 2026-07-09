@@ -6,6 +6,7 @@ export interface ComputeNpcStatsBody {
   damage_multiplier: number;
   exp_multiplier: number;
   defense_multiplier: number;
+  boss: boolean;
 }
 
 export interface ComputeNpcStatsResponse {

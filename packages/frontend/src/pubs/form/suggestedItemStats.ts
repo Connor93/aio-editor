@@ -35,8 +35,8 @@ export const SUGGESTED_ITEM_STATS: Record<number, SuggestedStats> = {
   17: { slot: "Belt", hp: 240, armor: 12 },
   18: { slot: "Necklace", hp: 180, armor: 3, minDamage: 20, maxDamage: 26, accuracy: 40 },
   19: { slot: "Ring", hp: 30, armor: 1, minDamage: 15, maxDamage: 19, accuracy: 50, note: "per ring — 2 slots share the budget" },
-  20: { slot: "Armlet", hp: 45, armor: 2, minDamage: 5, maxDamage: 7, note: "per armlet — 2 slots share the budget" },
-  21: { slot: "Bracer", hp: 68, armor: 2, minDamage: 3, maxDamage: 5, note: "per bracer — 2 slots share the budget" },
+  20: { slot: "Armlet", hp: 45, armor: 2, minDamage: 5, maxDamage: 7, accuracy: 10, note: "per armlet — 2 slots share the budget" },
+  21: { slot: "Bracer", hp: 68, armor: 2, minDamage: 3, maxDamage: 5, accuracy: 10, note: "per bracer — 2 slots share the budget" },
 };
 
 export function suggestedStatsForType(type: unknown): SuggestedStats | undefined {

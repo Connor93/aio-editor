@@ -30,6 +30,9 @@ export function ComputedStatsCard({
   const dmgMult = num(npc.damage_multiplier, 1);
   const expMult = num(npc.exp_multiplier, 1);
   const defMult = num(npc.defense_multiplier, 1);
+  // Boss flag drives the [balance] boss multipliers on hp/damage/xp, so the
+  // preview must send it or boss NPCs read as non-boss (understated).
+  const boss = npc.boss === true;
 
   const [computed, setComputed] = useState<ComputeNpcStatsResponse | null>(
     null
@@ -39,8 +42,8 @@ export function ComputedStatsCard({
 
   // Stable key so the effect only re-fires when a scaling input changes.
   const key = useMemo(
-    () => `${level}|${hpMult}|${dmgMult}|${expMult}|${defMult}`,
-    [level, hpMult, dmgMult, expMult, defMult]
+    () => `${level}|${hpMult}|${dmgMult}|${expMult}|${defMult}|${boss}`,
+    [level, hpMult, dmgMult, expMult, defMult, boss]
   );
 
   const onUnauthorizedRef = useRef(onUnauthorized);
@@ -59,6 +62,7 @@ export function ComputedStatsCard({
             damage_multiplier: dmgMult,
             exp_multiplier: expMult,
             defense_multiplier: defMult,
+            boss,
           },
           controller.signal
         );
