@@ -29,11 +29,7 @@ export function ComputedStatsCard({
   const hpMult = num(npc.hp_multiplier, 1);
   const dmgMult = num(npc.damage_multiplier, 1);
   const expMult = num(npc.exp_multiplier, 1);
-
-  // Raw passthrough — shown straight from the draft, no round-trip.
-  const accuracy = num(npc.accuracy, 0);
-  const evade = num(npc.evade, 0);
-  const armor = num(npc.armor, 0);
+  const defMult = num(npc.defense_multiplier, 1);
 
   const [computed, setComputed] = useState<ComputeNpcStatsResponse | null>(
     null
@@ -43,8 +39,8 @@ export function ComputedStatsCard({
 
   // Stable key so the effect only re-fires when a scaling input changes.
   const key = useMemo(
-    () => `${level}|${hpMult}|${dmgMult}|${expMult}`,
-    [level, hpMult, dmgMult, expMult]
+    () => `${level}|${hpMult}|${dmgMult}|${expMult}|${defMult}`,
+    [level, hpMult, dmgMult, expMult, defMult]
   );
 
   const onUnauthorizedRef = useRef(onUnauthorized);
@@ -62,6 +58,7 @@ export function ComputedStatsCard({
             hp_multiplier: hpMult,
             damage_multiplier: dmgMult,
             exp_multiplier: expMult,
+            defense_multiplier: defMult,
           },
           controller.signal
         );
@@ -120,7 +117,7 @@ export function ComputedStatsCard({
             }
             hint={
               computed
-                ? `${computed.baseMinDamage}–${computed.baseMaxDamage} × ${computed.curve.toFixed(2)} × ${dmgMult}`
+                ? `${computed.baseMinDamage}–${computed.baseMaxDamage} × ${computed.survivabilityCurve.toFixed(2)} × ${dmgMult}`
                 : undefined
             }
           />
@@ -134,17 +131,44 @@ export function ComputedStatsCard({
             }
           />
           <div className="my-1 border-t border-slate-800" />
-          <Row label="Accuracy" value={String(accuracy)} />
-          <Row label="Evade" value={String(evade)} />
-          <Row label="Armor" value={String(armor)} />
+          <Row
+            label="Accuracy"
+            value={computed ? String(computed.accuracy) : "—"}
+            hint={
+              computed
+                ? `${computed.baseAccuracy} × ${computed.survivabilityCurve.toFixed(2)} × ${defMult}`
+                : undefined
+            }
+          />
+          <Row
+            label="Evade"
+            value={computed ? String(computed.evade) : "—"}
+            hint={
+              computed
+                ? `${computed.baseEvade} × ${computed.survivabilityCurve.toFixed(2)} × ${defMult}`
+                : undefined
+            }
+          />
+          <Row
+            label="Armor"
+            value={computed ? String(computed.armor) : "—"}
+            hint={
+              computed
+                ? `${computed.baseArmor} × ${computed.survivabilityCurve.toFixed(2)} × ${defMult}`
+                : undefined
+            }
+          />
         </div>
       )}
 
       <p className="mt-2 text-[10px] leading-snug text-slate-500">
-        HP / Damage / XP are computed server-side from <code>level</code> +
-        multipliers. The pub <code>hp</code>, <code>min_damage</code>,{" "}
-        <code>max_damage</code> and <code>experience</code> fields are ignored
-        at runtime. Accuracy / Evade / Armor apply raw (unscaled).
+        All stats are computed server-side from <code>level</code> + multipliers.
+        HP / XP scale on the offense curve; Damage / Armor / Evade / Accuracy on
+        the survivability curve (Accuracy / Evade / Armor use{" "}
+        <code>defense_multiplier</code>). The pub <code>hp</code>,{" "}
+        <code>min_damage</code>, <code>max_damage</code>, <code>experience</code>,{" "}
+        <code>armor</code>, <code>evade</code> and <code>accuracy</code> fields
+        are all ignored at runtime.
       </p>
     </div>
   );

@@ -11,6 +11,7 @@ import {
   savePubFile,
 } from "./api";
 import { ComputedStatsCard } from "./form/ComputedStatsCard";
+import { SuggestedStatsCard } from "./form/SuggestedStatsCard";
 import { SchemaForm } from "./form/SchemaForm";
 import { type JsonSchema, makeDefault } from "./form/schema";
 import {
@@ -649,6 +650,13 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                           npc={parsedDraft.value as Record<string, unknown>}
                           token={token}
                           onUnauthorized={onUnauthorized}
+                        />
+                      )}
+                    {selection?.type === "items" &&
+                      parsedDraft.value != null &&
+                      typeof parsedDraft.value === "object" && (
+                        <SuggestedStatsCard
+                          item={parsedDraft.value as Record<string, unknown>}
                         />
                       )}
                     <SchemaForm

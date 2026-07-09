@@ -30,8 +30,8 @@
     },
     {
       "label": "Level + scaling",
-      "description": "NPC level drives HP, damage, and XP grants — each multiplied by the corresponding per-NPC tuner. Final values = base × level_curve(level) × multiplier. Base values live in Config.toml under [world]. The legacy EO pub fields (hp, min_damage, max_damage, experience) are all ignored.",
-      "fields": ["level", "hp_multiplier", "damage_multiplier", "exp_multiplier"]
+      "description": "NPC level drives HP, damage, XP, and defensive stats — each × its per-NPC tuner. HP/XP scale on offense_curve(level) (~360× at L50); damage/armor/evade/accuracy on survivability_curve(level) (~100× at L50). The `boss` flag multiplies HP/damage/XP by the [balance] boss multipliers. Base values live in Config.toml under [world]/[balance]. The legacy EO pub fields (hp, min_damage, max_damage, experience, armor, evade, accuracy) are all ignored — see the Effective-stats preview for what a player actually faces.",
+      "fields": ["level", "hp_multiplier", "damage_multiplier", "exp_multiplier", "defense_multiplier"]
     },
     {
       "label": "Rarity override",
@@ -198,21 +198,28 @@
       "title": "XP multiplier",
       "minimum": 0,
       "default": 1.0,
-      "description": "Per-NPC fine-tune on the level-scaled XP grant. 1.0 = exactly what the curve says; 1.5 = 50% more (story or boss NPCs); 0.5 = half (filler or weak NPCs). Multiplies on top of level_curve(level). Defaults to 1.0 if absent."
+      "description": "Per-NPC fine-tune on the level-scaled XP grant. 1.0 = exactly what the curve says; 1.5 = 50% more (story or boss NPCs); 0.5 = half (filler or weak NPCs). Multiplies on top of offense_curve(level). Defaults to 1.0 if absent."
+    },
+    "defense_multiplier": {
+      "type": "number",
+      "title": "Defense multiplier",
+      "minimum": 0,
+      "default": 1.0,
+      "description": "Per-NPC fine-tune on defensive stats (armor, evade, accuracy). 1.0 = curve baseline; >1 = harder to hit / mitigates more; <1 = easier to hit. Final armor/evade/accuracy = base × survivability_curve(level) × defense_multiplier. Not affected by the boss multipliers (those apply to HP/damage/XP only). Defaults to 1.0 if absent."
     },
     "hp_multiplier": {
       "type": "number",
       "title": "HP multiplier",
       "minimum": 0,
       "default": 1.0,
-      "description": "Per-NPC fine-tune on max HP. 1.0 = curve baseline; 3.0 = tanky boss (3× the HP of a same-level regular); 0.5 = squishy filler. Final HP = base_npc_hp × level_curve(level) × hp_multiplier. Defaults to 1.0 if absent."
+      "description": "Per-NPC fine-tune on max HP. 1.0 = curve baseline; 3.0 = tanky boss (3× the HP of a same-level regular); 0.5 = squishy filler. Final HP = base_npc_hp × offense_curve(level) × hp_multiplier. Defaults to 1.0 if absent."
     },
     "damage_multiplier": {
       "type": "number",
       "title": "Damage multiplier",
       "minimum": 0,
       "default": 1.0,
-      "description": "Per-NPC fine-tune on dealt damage. 1.0 = curve baseline; 2.5 = hard-hitting boss; 0.6 = pushover. Applied to both min and max base damage. Defaults to 1.0 if absent."
+      "description": "Per-NPC fine-tune on dealt damage. 1.0 = curve baseline; 2.5 = hard-hitting boss; 0.6 = pushover. Applied to both min and max base damage (which scale on survivability_curve). Defaults to 1.0 if absent."
     },
     "rarity_override": {
       "type": "object",
