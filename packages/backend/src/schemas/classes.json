@@ -39,6 +39,11 @@
       "minimum": 1,
       "default": 480,
       "description": "Base interval (ms) between steps for this class. Lower = faster."
+    },
+    "playable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether players can pick this class at character creation. Default true; uncheck to hide an unfinished class. Enforced server-side and pushed live to the eoweb class picker (no deploy)."
     }
   }
 }
