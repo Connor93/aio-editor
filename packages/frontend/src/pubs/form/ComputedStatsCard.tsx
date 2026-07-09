@@ -90,6 +90,14 @@ export function ComputedStatsCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, token]);
 
+  // A REOSERV predating the scaling rework returns no survivabilityCurve /
+  // armor / evade / accuracy — guard so the card degrades instead of crashing.
+  const hasScaledDefense = computed?.survivabilityCurve != null;
+  const survCurve = computed?.survivabilityCurve ?? 0;
+  // Damage scales on the survivability curve on a current server; fall back to
+  // the offense `curve` for the hint on an older server.
+  const dmgCurve = computed?.survivabilityCurve ?? computed?.curve ?? 0;
+
   return (
     <div className="sticky top-0 z-20 mb-4 rounded-md border border-slate-800 bg-slate-900 p-3 shadow-md shadow-slate-950/60">
       <div className="mb-2 flex items-baseline justify-between">
@@ -121,7 +129,7 @@ export function ComputedStatsCard({
             }
             hint={
               computed
-                ? `${computed.baseMinDamage}–${computed.baseMaxDamage} × ${computed.survivabilityCurve.toFixed(2)} × ${dmgMult}`
+                ? `${computed.baseMinDamage}–${computed.baseMaxDamage} × ${dmgCurve.toFixed(2)} × ${dmgMult}`
                 : undefined
             }
           />
@@ -135,33 +143,30 @@ export function ComputedStatsCard({
             }
           />
           <div className="my-1 border-t border-slate-800" />
-          <Row
-            label="Accuracy"
-            value={computed ? String(computed.accuracy) : "—"}
-            hint={
-              computed
-                ? `${computed.baseAccuracy} × ${computed.survivabilityCurve.toFixed(2)} × ${defMult}`
-                : undefined
-            }
-          />
-          <Row
-            label="Evade"
-            value={computed ? String(computed.evade) : "—"}
-            hint={
-              computed
-                ? `${computed.baseEvade} × ${computed.survivabilityCurve.toFixed(2)} × ${defMult}`
-                : undefined
-            }
-          />
-          <Row
-            label="Armor"
-            value={computed ? String(computed.armor) : "—"}
-            hint={
-              computed
-                ? `${computed.baseArmor} × ${computed.survivabilityCurve.toFixed(2)} × ${defMult}`
-                : undefined
-            }
-          />
+          {hasScaledDefense ? (
+            <>
+              <Row
+                label="Accuracy"
+                value={String(computed?.accuracy ?? 0)}
+                hint={`${computed?.baseAccuracy ?? 0} × ${survCurve.toFixed(2)} × ${defMult}`}
+              />
+              <Row
+                label="Evade"
+                value={String(computed?.evade ?? 0)}
+                hint={`${computed?.baseEvade ?? 0} × ${survCurve.toFixed(2)} × ${defMult}`}
+              />
+              <Row
+                label="Armor"
+                value={String(computed?.armor ?? 0)}
+                hint={`${computed?.baseArmor ?? 0} × ${survCurve.toFixed(2)} × ${defMult}`}
+              />
+            </>
+          ) : (
+            <p className="text-[10px] leading-snug text-amber-400/80">
+              Armor / Evade / Accuracy scaling needs an updated REOSERV (the
+              scaling rework). This server didn't return them.
+            </p>
+          )}
         </div>
       )}
 
