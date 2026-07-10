@@ -12,6 +12,7 @@ import {
 } from "./api";
 import { ComputedStatsCard } from "./form/ComputedStatsCard";
 import { SuggestedStatsCard } from "./form/SuggestedStatsCard";
+import { ItemScalingCard } from "./form/ItemScalingCard";
 import { SchemaForm } from "./form/SchemaForm";
 import { type JsonSchema, makeDefault } from "./form/schema";
 import {
@@ -655,9 +656,26 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                     {selection?.type === "items" &&
                       parsedDraft.value != null &&
                       typeof parsedDraft.value === "object" && (
-                        <SuggestedStatsCard
-                          item={parsedDraft.value as Record<string, unknown>}
-                        />
+                        <>
+                          <SuggestedStatsCard
+                            item={parsedDraft.value as Record<string, unknown>}
+                          />
+                          <ItemScalingCard
+                            item={parsedDraft.value as Record<string, unknown>}
+                            onPatch={(patch) =>
+                              setDraft(
+                                JSON.stringify(
+                                  {
+                                    ...(parsedDraft.value as Record<string, unknown>),
+                                    ...patch,
+                                  },
+                                  null,
+                                  2,
+                                ),
+                              )
+                            }
+                          />
+                        </>
                       )}
                     <SchemaForm
                       schema={schema}
