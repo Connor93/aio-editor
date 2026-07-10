@@ -18,11 +18,14 @@ export function SuggestedStatsCard({ item }: SuggestedStatsCardProps) {
   if (s.hp != null) {
     rows.push({ label: "HP", current: String(num(item.hp, 0)), suggested: `+${s.hp}` });
   }
-  if (s.minDamage != null || s.maxDamage != null) {
+  if (s.tp != null) {
+    rows.push({ label: "TP", current: String(num(item.tp, 0)), suggested: `+${s.tp}` });
+  }
+  if (s.min_damage != null || s.max_damage != null) {
     rows.push({
       label: "Damage",
       current: `${num(item.min_damage, 0)} – ${num(item.max_damage, 0)}`,
-      suggested: `${s.minDamage ?? 0} – ${s.maxDamage ?? 0}`,
+      suggested: `${s.min_damage ?? 0} – ${s.max_damage ?? 0}`,
     });
   }
   if (s.armor != null) {
@@ -34,14 +37,28 @@ export function SuggestedStatsCard({ item }: SuggestedStatsCardProps) {
   if (s.evade != null) {
     rows.push({ label: "Evade", current: String(num(item.evade, 0)), suggested: `+${s.evade}` });
   }
+  // Core-stat budgets (flavor-tier slot identity). Field key for INT is `intl`.
+  for (const [key, label] of [
+    ["str", "STR"],
+    ["intl", "INT"],
+    ["wis", "WIS"],
+    ["agi", "AGI"],
+    ["con", "CON"],
+    ["cha", "CHA"],
+  ] as const) {
+    const v = s[key];
+    if (v != null) {
+      rows.push({ label, current: String(num(item[key], 0)), suggested: `+${v}` });
+    }
+  }
 
   return (
     <div className="mb-4 rounded-md border border-emerald-900/60 bg-slate-900 p-3 shadow-md shadow-slate-950/60">
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
-          Suggested base stats — {s.slot}
+          Suggested stats — {s.slot}
         </h3>
-        <span className="text-[10px] text-slate-500">at max level</span>
+        <span className="text-[10px] text-slate-500">level {50} values</span>
       </div>
 
       <div className="mb-1 flex items-baseline justify-between text-[10px] uppercase tracking-wider text-slate-500">
@@ -71,9 +88,9 @@ export function SuggestedStatsCard({ item }: SuggestedStatsCardProps) {
         gear half of expected player power, split across the 15 equip slots).
         Under <em>author-at-max</em> scaling, put these values in the pub as-is —
         the world scales them <em>down</em> for lower-level drops. Damage /
-        accuracy scale on the offense curve, HP / armor on survivability.
-        Guidance only; core-stat bonuses (str / int / …) are usually mod-driven,
-        not base.
+        accuracy scale on the offense curve, everything else (HP / TP / armor /
+        evade + core stats) on survivability. Core-stat budgets are flavor-tier
+        slot identity — guidance only, layered on top of the hp/damage budget.
       </p>
     </div>
   );

@@ -42,7 +42,19 @@ export const SCALED_STATS: { key: string; label: string }[] = [
   { key: "armor", label: "Armor" },
   { key: "accuracy", label: "Accuracy" },
   { key: "evade", label: "Evade" },
+  // Core stats. Note INT's field key is `intl` (matches the item schema).
+  // All six route through the survivability curve via curveFor (they're not
+  // in OFFENSE_STATS) — matching s_def() in src/character/calculate_stats.rs.
+  { key: "str", label: "STR" },
+  { key: "intl", label: "INT" },
+  { key: "wis", label: "WIS" },
+  { key: "agi", label: "AGI" },
+  { key: "con", label: "CON" },
+  { key: "cha", label: "CHA" },
 ];
+
+/** Core-stat keys (survivability-scaled, mostly slot-identity flavor). */
+export const CORE_STATS = new Set(["str", "intl", "wis", "agi", "con", "cha"]);
 
 /** Drop levels shown in the preview. */
 export const PREVIEW_LEVELS = [1, 10, 25, MAX_LEVEL];
