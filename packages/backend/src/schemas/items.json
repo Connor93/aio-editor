@@ -9,7 +9,7 @@
   "x-aio-groups": [
     {
       "label": "Identity",
-      "fields": ["name", "graphic_id"]
+      "fields": ["name", "graphic_id", "spec1"]
     },
     {
       "label": "Type",
@@ -36,8 +36,8 @@
     },
     {
       "label": "Type-Specific Specs",
-      "description": "spec1/2/3 have meanings that vary by item type — see the loader.",
-      "fields": ["spec1", "spec2", "spec3"]
+      "description": "spec2/spec3 have meanings that vary by item type — see the loader.",
+      "fields": ["spec2", "spec3"]
     },
     {
       "label": "Requirements",
@@ -127,7 +127,8 @@
     "fire_resistance": { "type": "integer" },
     "spec1": {
       "type": "integer",
-      "description": "Type-dependent: ammo type for weapons, slot for armor, healing amount for consumables, etc."
+      "description": "Equippables (weapon/shield/armor/hat/boots): the ON-CHARACTER worn graphic drawn on the map sprite — use the picker. 0 leaves the item invisible on the character even though its inventory icon still shows. Other item types: type-dependent (ammo/heal/etc.).",
+      "x-aio-display": { "kind": "worn_gfx" }
     },
     "spec2": { "type": "integer", "description": "Type-dependent (see spec1)." },
     "spec3": { "type": "integer", "description": "Type-dependent (see spec1)." },
