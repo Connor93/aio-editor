@@ -75,20 +75,50 @@ export function SchemaField(props: CommonProps) {
   );
 }
 
-function GfxField({
-  schema,
-  value,
-  onChange,
-  path,
-  label,
-  required,
-  compact,
-}: CommonProps) {
+function GfxField({ schema, value, onChange, path, label, required, compact }: CommonProps) {
   const display = schema["x-aio-display"]!;
   if (display.kind !== "gfx") {
     return <div className="text-xs text-amber-400">expected gfx display</div>;
   }
-  const category = display.category;
+  return (
+    <GfxFieldInner
+      category={display.category}
+      label={label}
+      description={schema.description}
+      value={value}
+      onChange={onChange}
+      path={path}
+      required={required}
+      compact={compact}
+      min={schema.minimum ?? 0}
+      max={schema.maximum}
+    />
+  );
+}
+
+function GfxFieldInner({
+  category,
+  label,
+  description,
+  value,
+  onChange,
+  path,
+  required,
+  compact,
+  min,
+  max,
+}: {
+  category: string;
+  label?: string;
+  description?: string;
+  value: unknown;
+  onChange: (next: unknown) => void;
+  path: string;
+  required?: boolean;
+  compact?: boolean;
+  min?: number;
+  max?: number;
+}) {
   const stored = typeof value === "number" ? value : 0;
   const [draftStr, setDraftStr] = useState<string>(String(stored));
   const lastEchoed = useRef<number>(stored);
@@ -121,7 +151,7 @@ function GfxField({
 
   return (
     <div className="group/field block">
-      <FieldLabel label={label} required={required} description={schema.description} path={path} compact={compact} />
+      <FieldLabel label={label} required={required} description={description} path={path} compact={compact} />
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -135,8 +165,8 @@ function GfxField({
           type="number"
           value={draftStr}
           step={1}
-          min={schema.minimum ?? 0}
-          max={schema.maximum}
+          min={min ?? 0}
+          max={max}
           onChange={(e) => onInputChange(e.target.value)}
           className={`${INPUT_BASE} ${INPUT_OK} w-24 tabular-nums`}
           title="Type a graphic id directly"
