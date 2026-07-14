@@ -29,6 +29,22 @@ interface CategorySpec {
   resourceIdFor: (graphicId: number) => number;
   graphicIdFor: (resourceId: number) => number | null;
 }
+/** Worn / paperdoll graphics — the on-character sprite an equipped item draws
+ *  (item.spec1), distinct from the inventory icon (graphic_id). Male sheets are
+ *  canonical (spec1 is gender-agnostic). `stride` = frames per graphic (from
+ *  eoweb's compositor); the block-start frame is preview-canonical at
+ *  resource_id 101 + (g-1)*stride. */
+function wornSpec(fileId: number, stride: number): CategorySpec {
+  return {
+    fileId,
+    resourceIdFor: (g) => 101 + (g - 1) * stride,
+    graphicIdFor: (r) => {
+      if (r < 101) return null;
+      if ((r - 101) % stride !== 0) return null;
+      return (r - 101) / stride + 1;
+    },
+  };
+}
 const CATEGORIES: Record<string, CategorySpec> = {
   items: {
     fileId: 23,
@@ -68,6 +84,11 @@ const CATEGORIES: Record<string, CategorySpec> = {
       return r - 100;
     },
   },
+  worn_weapon: wornSpec(17, 100),
+  worn_shield: wornSpec(19, 50),
+  worn_armor: wornSpec(13, 50),
+  worn_hat: wornSpec(15, 10),
+  worn_boots: wornSpec(11, 40),
 };
 
 const SAFE_CATEGORY = /^[a-z_]+$/;
