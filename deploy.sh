@@ -64,6 +64,32 @@ if [[ -n "${GFX_SRC:-}" ]]; then
   fi
 fi
 
+# ── Worn-graphic preview dirs (one-time seed of origin-gfx) ──
+# The worn-graphic picker for equippable `spec1` serves the on-character sprite
+# sheets, which the first seed above never shipped: gfx017 (weapon), gfx019
+# (shield), gfx013 (armor), gfx015 (hat), gfx011 (boots) — the male sheets the
+# backend's worn_* categories reference. Kept as its own block (keyed on gfx017,
+# not gfx023) so it back-fills volumes seeded before these categories existed.
+if [[ -n "${GFX_SRC:-}" ]]; then
+  if [[ ! -d "$GFX_SRC/gfx017" ]]; then
+    echo "⚠️  GFX_SRC=$GFX_SRC has no gfx017/ — skipping worn-graphic seed (check the path)"
+  else
+    WORN_STATE=$(ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
+      "docker run --rm -v origin-gfx:/v alpine sh -c '[ -d /v/gfx017 ] && echo filled || echo empty'")
+    if [[ "$WORN_STATE" == "empty" ]]; then
+      echo "🧥 Seeding worn-graphic dirs into origin-gfx (gfx011/013/015/017/019) ..."
+      tar -C "$GFX_SRC" -czf /tmp/origin-worn.tgz gfx011 gfx013 gfx015 gfx017 gfx019
+      scp -P "$SSH_PORT" /tmp/origin-worn.tgz "${VPS_USER}@${VPS_HOST}:/tmp/origin-worn.tgz"
+      ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
+        "docker run --rm -v origin-gfx:/v -v /tmp/origin-worn.tgz:/seed.tgz:ro alpine sh -c 'tar -xzf /seed.tgz -C /v' && rm -f /tmp/origin-worn.tgz"
+      rm -f /tmp/origin-worn.tgz
+      echo "🧥 origin-gfx worn-graphic dirs seeded."
+    else
+      echo "🧥 Worn-graphic dirs already present in origin-gfx — skipping."
+    fi
+  fi
+fi
+
 # ── Map EGF files + brotli precompression (one-time seed for the editor) ──
 # eomap-js connected mode needs gfx003/004/005/006/007/022.egf in origin-gfx.
 # We also ship .egf.br siblings so the backend serves them with
