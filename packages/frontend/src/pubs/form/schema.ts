@@ -77,6 +77,12 @@ export interface JsonSchema {
         /** GFX category to load images from. Backend maps this to a
          *  `gfxNNN/` directory and computes `resource_id = 100 + value*2`. */
         category: "items" | "npcs" | "spells" | "spell_icons";
+      }
+    | {
+        /** Worn / on-character graphic for an equippable's `spec1`. The gfx
+         *  category is resolved at render from the sibling `type` value, so no
+         *  static category is stored here. */
+        kind: "worn_gfx";
       };
 }
 

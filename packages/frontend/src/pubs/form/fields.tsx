@@ -21,6 +21,10 @@ interface CommonProps {
   /** Compact rendering hint used inside grouped sections — single-line label,
    *  smaller inputs, no path/description chrome. */
   compact?: boolean;
+  /** The parent object's other field values, threaded down so a field can
+   *  react to a sibling (e.g. worn-graphic picker resolving its gfx category
+   *  from the item's `type`). Undefined at the root / for non-object fields. */
+  siblings?: Record<string, unknown>;
 }
 
 export function SchemaField(props: CommonProps) {
@@ -44,6 +48,10 @@ export function SchemaField(props: CommonProps) {
 
   if (resolved["x-aio-display"]?.kind === "gfx") {
     return <GfxField {...props} schema={resolved} />;
+  }
+
+  if (resolved["x-aio-display"]?.kind === "worn_gfx") {
+    return <WornGfxField {...props} schema={resolved} />;
   }
 
   if (resolved.type === "object") {
@@ -188,6 +196,44 @@ function GfxFieldInner({
         />
       )}
     </div>
+  );
+}
+
+/** eolib ItemType (equippable slots) → worn-graphic gfx category. Types not in
+ *  this map (heal/teleport/etc.) don't have a worn graphic — `spec1` there is a
+ *  plain type-dependent number. */
+const WORN_CATEGORY: Record<number, string> = {
+  10: "worn_weapon",
+  11: "worn_shield",
+  12: "worn_armor",
+  13: "worn_hat",
+  14: "worn_boots",
+};
+
+function WornGfxField(props: CommonProps) {
+  const itemType =
+    typeof props.siblings?.type === "number" ? (props.siblings.type as number) : undefined;
+  const category = itemType !== undefined ? WORN_CATEGORY[itemType] : undefined;
+
+  // Non-equippable (or type unset): spec1 is a type-dependent number
+  // (ammo/heal/etc.), not a graphic — render the plain number field, keeping
+  // the schema's "spec1" label + description.
+  if (!category) {
+    return <NumberField {...props} />;
+  }
+
+  return (
+    <GfxFieldInner
+      category={category}
+      label="Worn graphic"
+      description="On-character worn graphic (drawn on the map sprite)."
+      value={props.value}
+      onChange={props.onChange}
+      path={props.path}
+      required={props.required}
+      compact={props.compact}
+      min={0}
+    />
   );
 }
 
@@ -824,6 +870,7 @@ function ObjectField({ schema, value, onChange, rootSchema, path, label, require
                 required={requiredKeys.has(key)}
                 onChange={(next) => onChange({ ...obj, [key]: next })}
                 compact={compact}
+                siblings={obj}
               />
               {isOptional && (
                 <button
@@ -977,6 +1024,7 @@ function GroupedSection({
                 required={requiredKeys.has(key)}
                 onChange={(next) => onChange({ ...obj, [key]: next })}
                 compact={compactChildren}
+                siblings={obj}
               />
               {showRemove && (
                 <button
