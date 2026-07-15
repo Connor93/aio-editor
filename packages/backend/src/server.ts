@@ -12,6 +12,7 @@ import { registerMapperRoutes } from "./routes/mapper.js";
 import { registerComputeNpcStatsRoutes } from "./routes/compute_npc_stats.js";
 import { registerSimulateRollRoutes } from "./routes/simulate_roll.js";
 import { registerStagingRoutes } from "./routes/staging.js";
+import { registerUsageRoutes } from "./routes/usage.js";
 
 async function main() {
   const app = Fastify({
@@ -42,12 +43,14 @@ async function main() {
   registerAuthGuard(app, "/api/staging");
   registerAuthGuard(app, "/api/simulate_roll");
   registerAuthGuard(app, "/api/compute_npc_stats");
+  registerAuthGuard(app, "/api/usage");
   registerAuthGuard(app, "/api/maps");
   await registerPubRoutes(app);
   await registerStagingRoutes(app);
   await registerGfxRoutes(app);
   await registerSimulateRollRoutes(app);
   await registerComputeNpcStatsRoutes(app);
+  await registerUsageRoutes(app);
   await registerMapRoutes(app);
   await registerMapperRoutes(app);
 
