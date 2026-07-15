@@ -32,6 +32,8 @@ import type {
   PubType,
   ValidationIssue,
 } from "./types";
+import { fetchUsage, type UsageReport } from "./usage/api";
+import { UsageDot } from "./usage/UsageDot";
 
 type EditorMode = "form" | "json";
 
@@ -69,6 +71,10 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
   const [diff, setDiff] = useState<PubFileDiff | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
   const [stagingBusy, setStagingBusy] = useState(false);
+  const [usage, setUsage] = useState<UsageReport | null>(null);
+  const [usageFilter, setUsageFilter] = useState<"all" | "used" | "unused">(
+    "all"
+  );
 
   const handleApiError = useCallback(
     (err: unknown, fallback: string): void => {
@@ -116,6 +122,31 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
     return () => ctrl.abort();
   }, [refreshStaging]);
 
+  const refreshUsage = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const u = await fetchUsage(token, signal);
+        if (!signal?.aborted) setUsage(u);
+      } catch {
+        // reoserv offline / usage unavailable — hide indicators, don't disrupt
+        // the list (graceful degradation, D5).
+        if (!signal?.aborted) setUsage(null);
+      }
+    },
+    [token]
+  );
+
+  useEffect(() => {
+    if (selectedType !== "items" && selectedType !== "npcs") {
+      setUsage(null);
+      setUsageFilter("all");
+      return;
+    }
+    const ctrl = new AbortController();
+    refreshUsage(ctrl.signal);
+    return () => ctrl.abort();
+  }, [selectedType, refreshUsage]);
+
   useEffect(() => {
     if (selectedType === null) return;
     const ctrl = new AbortController();
@@ -133,20 +164,36 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
     return () => ctrl.abort();
   }, [selectedType, token, handleApiError]);
 
+  const usageForType =
+    (selectedType === "items" || selectedType === "npcs") && usage
+      ? selectedType === "items"
+        ? usage.items
+        : usage.npcs
+      : null;
+
   // Case-insensitive substring filter over the leading numeric ID and the
-  // display name. Both are checked so "0014" finds the file directly and
-  // "drag" finds anything named "Dragon Slayer".
+  // display name, then the used/unused usage filter (items & npcs only).
   const visibleFiles = useMemo(() => {
     if (!files) return null;
     const q = fileSearch.trim().toLowerCase();
-    if (!q) return files;
-    return files.filter((f) => {
-      const idStr = f.filename.replace(/\.json$/, "").toLowerCase();
-      if (idStr.includes(q)) return true;
-      if (f.name && f.name.toLowerCase().includes(q)) return true;
-      return false;
-    });
-  }, [files, fileSearch]);
+    let out = files;
+    if (q) {
+      out = out.filter((f) => {
+        const idStr = f.filename.replace(/\.json$/, "").toLowerCase();
+        if (idStr.includes(q)) return true;
+        if (f.name && f.name.toLowerCase().includes(q)) return true;
+        return false;
+      });
+    }
+    if (usageForType && usageFilter !== "all") {
+      out = out.filter((f) => {
+        const id = parseInt(f.filename, 10);
+        const used = Number.isFinite(id) && !!usageForType[String(id)];
+        return usageFilter === "used" ? used : !used;
+      });
+    }
+    return out;
+  }, [files, fileSearch, usageForType, usageFilter]);
 
   useEffect(() => {
     if (selection === null) {
@@ -238,6 +285,9 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
           );
         }
         await refreshStaging();
+        if (selectedType === "items" || selectedType === "npcs") {
+          await refreshUsage();
+        }
       }
     } catch (err) {
       handleApiError(err, "push failed");
@@ -270,6 +320,9 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
       if (selectedType && files) {
         const refreshed = await fetchPubFiles(selectedType, token);
         setFiles(refreshed);
+      }
+      if (selectedType === "items" || selectedType === "npcs") {
+        await refreshUsage();
       }
     } finally {
       setStagingBusy(false);
@@ -486,6 +539,25 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                 </button>
               )}
             </div>
+            {usageForType && (
+              <div className="mt-1.5 flex items-center gap-1 text-[11px]">
+                <span className="text-slate-500">Usage:</span>
+                {(["all", "used", "unused"] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setUsageFilter(f)}
+                    className={`rounded px-1.5 py-0.5 capitalize transition-colors ${
+                      usageFilter === f
+                        ? "bg-slate-700 text-slate-100"
+                        : "text-slate-400 hover:bg-slate-800"
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
@@ -530,6 +602,11 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                           </span>
                         )}
                       </span>
+                      {usageForType && (
+                        <UsageDot
+                          entry={usageForType[String(parseInt(f.filename, 10))]}
+                        />
+                      )}
                       <span className="shrink-0 font-mono text-[10px] text-slate-500">
                         {f.filename.replace(/\.json$/, "")}
                       </span>
