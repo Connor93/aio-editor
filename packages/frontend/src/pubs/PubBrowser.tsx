@@ -503,7 +503,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             Files{" "}
             {files &&
-              (fileSearch && visibleFiles
+              (visibleFiles && visibleFiles.length !== files.length
                 ? `(${visibleFiles.length}/${files.length})`
                 : `(${files.length})`)}
           </h2>
@@ -569,7 +569,7 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
             <p className="px-2 py-1 text-sm text-slate-500">no files</p>
           ) : visibleFiles && visibleFiles.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">
-              no files match “{fileSearch}”
+              {fileSearch ? `no files match “${fileSearch}”` : `no ${usageFilter} files`}
             </p>
           ) : (
             <ul className="space-y-0.5">
