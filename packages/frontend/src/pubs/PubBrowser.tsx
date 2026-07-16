@@ -33,6 +33,7 @@ import type {
   ValidationIssue,
 } from "./types";
 import { fetchUsage, type UsageReport } from "./usage/api";
+import { UsageCard } from "./usage/UsageCard";
 import { UsageDot } from "./usage/UsageDot";
 
 type EditorMode = "form" | "json";
@@ -146,6 +147,14 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
     refreshUsage(ctrl.signal);
     return () => ctrl.abort();
   }, [selectedType, refreshUsage]);
+
+  // Jump the editor to a referenced pub file (e.g. from a "Used in" ref).
+  // Directory pubs use 4-digit zero-padded ids (0042.json).
+  const navigateToPub = useCallback((type: string, id: number) => {
+    const filename = `${String(id).padStart(4, "0")}.json`;
+    setSelectedType(type);
+    setSelection({ type, filename });
+  }, []);
 
   useEffect(() => {
     if (selectedType === null) return;
@@ -730,6 +739,15 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                           onUnauthorized={onUnauthorized}
                         />
                       )}
+                    {selection?.type === "npcs" && usageForType && (
+                      <UsageCard
+                        entry={
+                          usageForType[String(parseInt(selection.filename, 10))]
+                        }
+                        kind="npcs"
+                        onNavigate={navigateToPub}
+                      />
+                    )}
                     {selection?.type === "items" &&
                       parsedDraft.value != null &&
                       typeof parsedDraft.value === "object" && (
@@ -754,6 +772,15 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                           />
                         </>
                       )}
+                    {selection?.type === "items" && usageForType && (
+                      <UsageCard
+                        entry={
+                          usageForType[String(parseInt(selection.filename, 10))]
+                        }
+                        kind="items"
+                        onNavigate={navigateToPub}
+                      />
+                    )}
                     <SchemaForm
                       schema={schema}
                       value={parsedDraft.value}
