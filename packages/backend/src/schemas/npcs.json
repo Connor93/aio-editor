@@ -77,7 +77,8 @@
         { "value": 12, "label": "Priest" },
         { "value": 13, "label": "Lawyer" },
         { "value": 14, "label": "Trainer" },
-        { "value": 15, "label": "Quest" }
+        { "value": 15, "label": "Quest" },
+        { "value": 16, "label": "Enchanter", "description": "REOSERV custom type (not in eolib) — opens the shard enchanting window: spend shards to upgrade an item's rarity, re-roll its mods, or cap a mod's roll." }
       ]
     },
     "behavior_id": {
