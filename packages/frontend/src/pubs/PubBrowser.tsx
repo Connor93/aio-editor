@@ -14,6 +14,7 @@ import { ComputedStatsCard } from "./form/ComputedStatsCard";
 import { SuggestedStatsCard } from "./form/SuggestedStatsCard";
 import { ItemScalingCard } from "./form/ItemScalingCard";
 import { SchemaForm } from "./form/SchemaForm";
+import { EditorActions } from "./form/EditorActions";
 import { type JsonSchema, makeDefault } from "./form/schema";
 import {
   type PubFileDiff,
@@ -676,45 +677,19 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                     </button>
                   </div>
                 )}
-                {statusMessage && (
-                  <span className="text-xs text-emerald-400">{statusMessage}</span>
-                )}
-                {error && <span className="text-xs text-red-400">{error}</span>}
-                {fileContent?.staged && (
-                  <>
-                    <button
-                      onClick={onOpenDiff}
-                      disabled={stagingBusy || diffLoading}
-                      className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50"
-                      title="Show diff against live"
-                    >
-                      {diffLoading ? "…" : "Diff"}
-                    </button>
-                    <button
-                      onClick={onDiscard}
-                      disabled={stagingBusy}
-                      className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50"
-                      title="Discard staged change; revert to live"
-                    >
-                      Discard
-                    </button>
-                    <button
-                      onClick={onPushOne}
-                      disabled={stagingBusy}
-                      className="rounded-md border border-amber-700/60 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
-                      title="Atomically copy staging → live"
-                    >
-                      Push to live
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={onSave}
-                  disabled={!dirty || saving}
-                  className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save to staging"}
-                </button>
+                <EditorActions
+                  staged={!!fileContent?.staged}
+                  dirty={dirty}
+                  saving={saving}
+                  stagingBusy={stagingBusy}
+                  diffLoading={diffLoading}
+                  statusMessage={statusMessage}
+                  error={error}
+                  onOpenDiff={onOpenDiff}
+                  onDiscard={onDiscard}
+                  onPushOne={onPushOne}
+                  onSave={onSave}
+                />
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
