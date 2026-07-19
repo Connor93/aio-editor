@@ -19,10 +19,23 @@ export function AppShell({ token, expiresAt, onLogout }: AppShellProps) {
 
   return (
     <div className="h-screen flex flex-col">
-      <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-6 py-3">
-        <div className="flex items-baseline gap-6">
-          <h1 className="text-lg font-semibold">AIO Editor</h1>
-          <nav className="flex gap-1 text-sm">
+      <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-slate-800 bg-slate-900 px-4 py-3 sm:px-6">
+        <h1 className="order-1 text-lg font-semibold">AIO Editor</h1>
+        <div className="order-2 ml-auto flex items-center gap-4 text-sm sm:order-3">
+          {expiresAt && (
+            <span className="hidden text-slate-400 sm:inline">
+              session ends {new Date(expiresAt).toLocaleString()}
+            </span>
+          )}
+          <button
+            onClick={onLogout}
+            className="rounded-md border border-slate-700 px-3 py-1 text-slate-300 hover:bg-slate-800"
+          >
+            Sign out
+          </button>
+        </div>
+        <nav className="order-3 w-full overflow-x-auto pb-0.5 text-sm sm:order-2 sm:w-auto sm:overflow-visible">
+          <div className="flex w-max gap-1">
             <NavTab
               active={view === "pubs"}
               onClick={() => setView("pubs")}
@@ -43,21 +56,8 @@ export function AppShell({ token, expiresAt, onLogout }: AppShellProps) {
               onClick={() => setView("mapeditor")}
               label="Map Editor"
             />
-          </nav>
-        </div>
-        <div className="flex items-center gap-4 text-sm">
-          {expiresAt && (
-            <span className="text-slate-400">
-              session ends {new Date(expiresAt).toLocaleString()}
-            </span>
-          )}
-          <button
-            onClick={onLogout}
-            className="rounded-md border border-slate-700 px-3 py-1 text-slate-300 hover:bg-slate-800"
-          >
-            Sign out
-          </button>
-        </div>
+          </div>
+        </nav>
       </header>
 
       <main className="flex-1 overflow-hidden">
