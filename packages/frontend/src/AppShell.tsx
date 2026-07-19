@@ -18,7 +18,7 @@ export function AppShell({ token, expiresAt, onLogout }: AppShellProps) {
   const [view, setView] = useState<View>("pubs");
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-dvh flex flex-col">
       <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-slate-800 bg-slate-900 px-4 py-3 sm:px-6">
         <h1 className="order-1 text-lg font-semibold">AIO Editor</h1>
         <div className="order-2 ml-auto flex items-center gap-4 text-sm sm:order-3">
