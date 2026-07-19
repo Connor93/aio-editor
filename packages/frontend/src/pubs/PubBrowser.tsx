@@ -458,9 +458,20 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
     }
   }
 
+  // Which single panel fills the screen below `lg`. Derived from existing
+  // selection state so every navigation path (tap type/file, staging jump,
+  // "Used in" ref jump) lands on the right panel with no extra wiring.
+  const activePanel: "types" | "files" | "editor" = selection
+    ? "editor"
+    : selectedType
+      ? "files"
+      : "types";
+
   return (
-    <div className="grid h-full grid-cols-[14rem_20rem_1fr] gap-0 border-t border-slate-800">
-      <aside className="flex min-h-0 flex-col border-r border-slate-800 bg-slate-950/40">
+    <div className="flex h-full flex-col border-t border-slate-800 lg:grid lg:grid-cols-[14rem_20rem_1fr] lg:gap-0">
+      <aside
+        className={`${activePanel === "types" ? "flex" : "hidden"} min-h-0 flex-1 flex-col border-r border-slate-800 bg-slate-950/40 lg:flex lg:flex-none`}
+      >
         <StagingPanel
           staged={staged}
           selectedType={selection?.type ?? null}
@@ -508,15 +519,31 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
         </div>
       </aside>
 
-      <aside className="flex min-h-0 flex-col border-r border-slate-800 bg-slate-950/20">
+      <aside
+        className={`${activePanel === "files" ? "flex" : "hidden"} min-h-0 flex-1 flex-col border-r border-slate-800 bg-slate-950/20 lg:flex lg:flex-none`}
+      >
         <div className="flex items-center justify-between border-b border-slate-800/60 px-3 py-2">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Files{" "}
-            {files &&
-              (visibleFiles && visibleFiles.length !== files.length
-                ? `(${visibleFiles.length}/${files.length})`
-                : `(${files.length})`)}
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedType(null);
+                setSelection(null);
+              }}
+              className="-ml-1 rounded px-1 text-lg leading-none text-slate-400 hover:bg-slate-800 hover:text-slate-200 lg:hidden"
+              title="Back to pub types"
+              aria-label="Back to pub types"
+            >
+              ‹
+            </button>
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Files{" "}
+              {files &&
+                (visibleFiles && visibleFiles.length !== files.length
+                  ? `(${visibleFiles.length}/${files.length})`
+                  : `(${files.length})`)}
+            </h2>
+          </div>
           {canCreateNew && (
             <button
               onClick={onCreateNew}
@@ -629,7 +656,9 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-col bg-slate-950/0">
+      <section
+        className={`${activePanel === "editor" ? "flex" : "hidden"} min-h-0 flex-1 flex-col bg-slate-950/0 lg:flex lg:flex-none`}
+      >
         {selection === null ? (
           <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
             pick a file to edit
@@ -638,6 +667,15 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
           <>
             <div className="flex items-center justify-between gap-4 border-b border-slate-800 bg-slate-950/40 px-4 py-2 text-sm">
               <div className="flex min-w-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelection(null)}
+                  className="-ml-1 rounded px-1 text-lg leading-none text-slate-400 hover:bg-slate-800 hover:text-slate-200 lg:hidden"
+                  title="Back to files"
+                  aria-label="Back to files"
+                >
+                  ‹
+                </button>
                 <span className="truncate font-mono text-slate-200">
                   {selection.type}/{selection.filename}
                 </span>
@@ -677,19 +715,21 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                     </button>
                   </div>
                 )}
-                <EditorActions
-                  staged={!!fileContent?.staged}
-                  dirty={dirty}
-                  saving={saving}
-                  stagingBusy={stagingBusy}
-                  diffLoading={diffLoading}
-                  statusMessage={statusMessage}
-                  error={error}
-                  onOpenDiff={onOpenDiff}
-                  onDiscard={onDiscard}
-                  onPushOne={onPushOne}
-                  onSave={onSave}
-                />
+                <div className="hidden items-center gap-3 lg:flex">
+                  <EditorActions
+                    staged={!!fileContent?.staged}
+                    dirty={dirty}
+                    saving={saving}
+                    stagingBusy={stagingBusy}
+                    diffLoading={diffLoading}
+                    statusMessage={statusMessage}
+                    error={error}
+                    onOpenDiff={onOpenDiff}
+                    onDiscard={onDiscard}
+                    onPushOne={onPushOne}
+                    onSave={onSave}
+                  />
+                </div>
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
@@ -791,6 +831,24 @@ export function PubBrowser({ token, onUnauthorized }: PubBrowserProps) {
                 </ul>
               </div>
             )}
+            {/* Mobile-only action bar. Normal-flow flex child placed AFTER the scroll
+                region, so the editor content can never be hidden behind it. Desktop keeps
+                its actions in the top toolbar (this is lg:hidden). */}
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-800 bg-slate-950/40 px-4 py-2 lg:hidden">
+              <EditorActions
+                staged={!!fileContent?.staged}
+                dirty={dirty}
+                saving={saving}
+                stagingBusy={stagingBusy}
+                diffLoading={diffLoading}
+                statusMessage={statusMessage}
+                error={error}
+                onOpenDiff={onOpenDiff}
+                onDiscard={onDiscard}
+                onPushOne={onPushOne}
+                onSave={onSave}
+              />
+            </div>
           </>
         )}
       </section>
