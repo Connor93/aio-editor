@@ -284,7 +284,7 @@ function GraphicPicker({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur sm:p-6"
       onClick={onClose}
     >
       <div
