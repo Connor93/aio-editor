@@ -18,7 +18,7 @@
     },
     {
       "label": "Combat",
-      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage", "attack_rate_ms"]
+      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage", "attack_rate_ms", "range"]
     },
     {
       "label": "Character Stats",
@@ -112,6 +112,11 @@
       "type": "integer",
       "minimum": 1,
       "description": "Weapons only: absolute swing interval in ms (dagger ~400, greatsword ~900). Omit to inherit the wielder's class unarmed rate."
+    },
+    "range": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Weapons only: attack range in tiles (melee = 1, bow ~5). Omit to use the default (melee, or the server's weapon_ranges config fallback). Note: the 'requires arrows' rule still lives in the server's weapon_ranges config, not here."
     },
     "str": { "type": "integer" },
     "intl": { "type": "integer" },
