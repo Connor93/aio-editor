@@ -301,7 +301,9 @@ export function composeVfxName(
 
   if (shapeId.startsWith(COMBO_PREFIX)) {
     if (!element || !ELEMENT_KEYS.has(element)) return null;
-    const [kindA, kindB] = shapeId.slice(COMBO_PREFIX.length).split('+');
+    const parts = shapeId.slice(COMBO_PREFIX.length).split('+');
+    if (parts.length !== 2) return null;
+    const [kindA, kindB] = parts;
     const known = COMBOS.some(([a, b]) => a === kindA && b === kindB);
     return known ? `${kindA}-${kindB}-${element}` : null;
   }
