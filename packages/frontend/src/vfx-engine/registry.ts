@@ -13,7 +13,7 @@ export type SizeKey = 'sm' | 'base' | 'lg';
 // [UI key, NAME SUFFIX, sizeScale]. The suffix is '' at base size — the
 // generated name is `nova-fire`, never `nova-fire-base`. Keep these distinct:
 // 'base' is unusable as a name suffix and '' is unusable as a UI key.
-export const SIZES: ReadonlyArray<
+const SIZES: ReadonlyArray<
   readonly [key: SizeKey, suffix: string, sizeScale: number]
 > = [
   ['sm', 'sm', 0.6],
@@ -22,7 +22,7 @@ export const SIZES: ReadonlyArray<
 ];
 
 // Curated kind pairs composited as `kindA` (base) + `kindB` (combo layer).
-export const COMBOS: ReadonlyArray<readonly [ShapeKind, ShapeKind]> = [
+const COMBOS: ReadonlyArray<readonly [ShapeKind, ShapeKind]> = [
   ['nova', 'sparkle'],
   ['ring', 'slash'],
   ['disc', 'spark-burst'],
@@ -35,7 +35,7 @@ export const COMBOS: ReadonlyArray<readonly [ShapeKind, ShapeKind]> = [
 
 // Fixed, hand-tuned effects that don't fit the element matrix (heals,
 // buffs, crits, ...).
-export const SPECIALS: Record<string, VfxDef> = {
+const SPECIALS: Record<string, VfxDef> = {
   'heal-glow': {
     kind: 'disc',
     color: 0x86efac,
