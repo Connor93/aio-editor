@@ -29,6 +29,13 @@ export interface JsonSchema {
   default?: unknown;
   description?: string;
   title?: string;
+  /** Discriminated / untagged union. Rendered by OneOfField. */
+  oneOf?: JsonSchema[];
+  /** Frontend hint: the property whose value selects the oneOf branch.
+   *  Absent → untagged union (branches distinguished by JSON type). */
+  discriminator?: { propertyName: string };
+  /** Single allowed value (used to pin a union branch's tag). */
+  const?: unknown;
   /** AIO Editor extension. Ignored by Ajv (we run with strict: false). */
   "x-aio-groups"?: FieldGroup[];
   /** AIO Editor extension. Renders the field as a labelled select dropdown
@@ -118,6 +125,14 @@ export function resolveRef(
  *  rather than always returning the literal zero value for the type. */
 export function makeDefault(schema: JsonSchema, rootSchema: JsonSchema): unknown {
   const resolved = resolveRef(schema, rootSchema);
+  // A `const` node (a pinned union tag) skeletons to its fixed value.
+  if (Object.prototype.hasOwnProperty.call(resolved, "const")) {
+    return resolved.const;
+  }
+  if (Array.isArray(resolved.oneOf) && resolved.oneOf.length > 0) {
+    // Default a union to its first branch's skeleton.
+    return makeDefault(resolved.oneOf[0]!, rootSchema);
+  }
   // An explicit `default` at this node wins over the type-driven fallback.
   // Object schemas keep the recursive path because their default-included
   // children aren't all expressible as a single literal — see the object

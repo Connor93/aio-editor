@@ -54,6 +54,10 @@ export function SchemaField(props: CommonProps) {
     return <WornGfxField {...props} schema={resolved} />;
   }
 
+  if (resolved.oneOf) {
+    return <OneOfField {...props} schema={resolved} />;
+  }
+
   if (resolved.type === "object") {
     if (resolved.properties) return <ObjectField {...props} schema={resolved} />;
     if (resolved.additionalProperties && resolved.additionalProperties !== true)
@@ -753,6 +757,10 @@ const INPUT_BASE =
   "rounded-md border bg-slate-950 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500/40 disabled:opacity-50";
 const INPUT_OK = "border-slate-700";
 const INPUT_WARN = "border-amber-600/70";
+/** Same look as the other bare `<select>` fields (e.g. SelectField's
+ *  className) — OneOfField's variant picker never has a "compact" or
+ *  "unrecognized value" state, so it doesn't need those ternaries. */
+const SELECT_CLS = `${INPUT_BASE} ${INPUT_OK} w-full`;
 
 /** Strip common suffixes for the very tight inline stat-block layout. Keeps
  *  the label informative ("LIGHT" / "STR REQ" / "MIN DMG") without overflowing
@@ -808,6 +816,82 @@ function FieldLabel({
       <span className="hidden font-mono text-[10px] text-slate-600 group-hover/field:inline">
         {path}
       </span>
+    </div>
+  );
+}
+
+function branchTitle(b: JsonSchema, i: number): string {
+  return b.title ?? `Option ${i + 1}`;
+}
+
+// Which oneOf branch does the current value match?
+function activeBranchIndex(
+  branches: JsonSchema[],
+  discrim: string | undefined,
+  value: unknown,
+): number {
+  if (discrim && value && typeof value === "object") {
+    const tag = (value as Record<string, unknown>)[discrim];
+    const i = branches.findIndex(
+      (b) => b.properties?.[discrim]?.const === tag,
+    );
+    if (i >= 0) return i;
+  }
+  if (!discrim) {
+    // Untagged: match by JSON type (object vs scalar).
+    const isObj = value !== null && typeof value === "object" && !Array.isArray(value);
+    const i = branches.findIndex((b) => (b.type === "object") === isObj);
+    if (i >= 0) return i;
+  }
+  return 0;
+}
+
+function OneOfField({ schema, value, onChange, rootSchema, path, label, required }: CommonProps) {
+  const branches = schema.oneOf ?? [];
+  const discrim = schema.discriminator?.propertyName;
+  const active = activeBranchIndex(branches, discrim, value);
+  const branch = branches[active] ?? branches[0];
+
+  const onPick = (nextIdx: number) => {
+    if (nextIdx === active) return;
+    const nextBranch = branches[nextIdx];
+    if (!nextBranch) return;
+    onChange(makeDefault(nextBranch, rootSchema));
+  };
+
+  if (!branch) {
+    return (
+      <div className="text-xs text-amber-400">oneOf with no branches at {path}</div>
+    );
+  }
+
+  // For an object branch, render its fields but hide the discriminator prop
+  // (the <select> owns it). Build a copy of the branch minus that property.
+  const childSchema: JsonSchema =
+    branch.type === "object" && discrim && branch.properties
+      ? { ...branch, properties: Object.fromEntries(
+            Object.entries(branch.properties).filter(([k]) => k !== discrim)) }
+      : branch;
+
+  return (
+    <div className="space-y-1">
+      <FieldLabel label={label} required={required} path={path} />
+      <select
+        className={SELECT_CLS}
+        value={String(active)}
+        onChange={(e) => onPick(Number((e.target as HTMLSelectElement).value))}
+      >
+        {branches.map((b, i) => (
+          <option key={i} value={String(i)}>{branchTitle(b, i)}</option>
+        ))}
+      </select>
+      <SchemaField
+        schema={childSchema}
+        value={value}
+        onChange={onChange}
+        rootSchema={rootSchema}
+        path={path}
+      />
     </div>
   );
 }
