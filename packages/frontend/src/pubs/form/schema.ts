@@ -38,6 +38,14 @@ export interface JsonSchema {
   const?: unknown;
   /** AIO Editor extension. Ignored by Ajv (we run with strict: false). */
   "x-aio-groups"?: FieldGroup[];
+  /** AIO Editor extension. Renders the field as a free-text input backed by a
+   *  `<datalist>` of suggested values (icon/vfx string refs). Stores the raw
+   *  string on save — unknown values are always allowed, since eoweb vendors
+   *  new icon/vfx refs independently of this list. An explicit non-empty
+   *  array wins; an empty array (`[]`, still a truthy marker) falls back to
+   *  a built-in suggestion list resolved from the field's path — see
+   *  `suggestionsForPath` in fields.tsx. */
+  "x-aio-suggest"?: string[];
   /** AIO Editor extension. Renders the field as a labelled select dropdown
    *  instead of a bare input. Free-form values are still accepted on save —
    *  Ajv only sees `type`/`minimum`/etc. — so forward-compat with new

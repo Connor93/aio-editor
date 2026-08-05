@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useRefs } from "../refs/RefsContext";
 import { type JsonSchema, makeDefault, resolveRef } from "./schema";
+import { ICON_SUGGESTIONS, VFX_SUGGESTIONS } from "./suggest-values";
 
 /** Parse the leading numeric portion of a filename like "0042.json" → 42.
  *  Returns null for filenames that don't start with digits. */
@@ -40,6 +41,10 @@ export function SchemaField(props: CommonProps) {
       return <StringReferenceField {...props} schema={resolved} />;
     }
     return <ReferenceField {...props} schema={resolved} />;
+  }
+
+  if (resolved["x-aio-suggest"]) {
+    return <SuggestField {...props} schema={resolved} />;
   }
 
   if (resolved["x-aio-display"]?.kind === "percent") {
@@ -1289,6 +1294,44 @@ function StringField({ schema, value, onChange, path, label, required, compact }
         onChange={(e) => onChange(e.target.value)}
         className={`${INPUT_BASE} ${tooShort ? INPUT_WARN : INPUT_OK} ${compact ? "mt-0.5 w-full" : "w-full"}`}
       />
+    </label>
+  );
+}
+
+/** Resolves the vendored suggestion list for a field from its path when the
+ *  schema doesn't supply an explicit `x-aio-suggest` list (i.e. the schema
+ *  only marks the field with an empty `[]` to route it here). Paths look
+ *  like `/actions/0/icon_id` or `/actions/0/cast_vfx`. */
+function suggestionsForPath(path: string): string[] {
+  if (path.endsWith("icon_id")) return ICON_SUGGESTIONS;
+  if (path.endsWith("cast_vfx") || path.endsWith("impact_vfx")) return VFX_SUGGESTIONS;
+  return [];
+}
+
+/** Free-text string input with a `<datalist>` of suggested values — used for
+ *  icon/vfx string refs. Unknown values are always accepted on save; the
+ *  datalist is authoring convenience only, not validation. */
+function SuggestField({ schema, value, onChange, path, label, required, compact }: CommonProps) {
+  const listId = `suggest-${path}`;
+  const explicit = schema["x-aio-suggest"] ?? [];
+  const suggestions = explicit.length ? explicit : suggestionsForPath(path);
+  const current = typeof value === "string" ? value : "";
+
+  return (
+    <label className="group/field block">
+      <FieldLabel label={label} required={required} description={schema.description} path={path} compact={compact} />
+      <input
+        type="text"
+        list={listId}
+        value={current}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${INPUT_BASE} ${INPUT_OK} ${compact ? "mt-0.5 w-full" : "w-full"}`}
+      />
+      <datalist id={listId}>
+        {suggestions.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
     </label>
   );
 }
