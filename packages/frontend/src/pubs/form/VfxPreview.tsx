@@ -25,6 +25,14 @@ const CHECKER_BACKGROUND = {
 export function VfxPreview({ value }: { value: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [playing, setPlaying] = useState(true);
+  /** Progress of the most recently painted frame, so pausing can re-paint
+   *  THAT frame. Drawing a fixed `0` instead would blank the canvas for the
+   *  7 kinds whose progress-0 geometry is degenerate (`ring`, `disc`,
+   *  `spark-burst`, `shockwave`, `burst-lines`, `beam-pop`, `chains` all
+   *  have zero radius/length/height there) — the exact opposite of what a
+   *  pause button is for. A ref, not state: the rAF tick writes it every
+   *  frame and must not re-render the component to do so. */
+  const progressRef = useRef(0);
   const def = VFX_REGISTRY[value];
 
   useEffect(() => {
@@ -37,16 +45,18 @@ export function VfxPreview({ value }: { value: string }) {
     const half = FRAME_SIZE / 2;
 
     if (!playing) {
-      // Paint one static frame so a paused preview still shows the effect
-      // instead of going blank; no rAF loop to cancel.
-      drawEffectAt(ctx, def, 0, half, half);
+      // Freeze on the last frame the loop actually rendered; no rAF to cancel.
+      drawEffectAt(ctx, def, progressRef.current, half, half);
       return;
     }
 
     let rafId = 0;
-    const start = performance.now();
+    // Back-date the clock by the frozen progress so ▶ RESUMES from where ⏸
+    // stopped instead of snapping back to the start of the effect.
+    const start = performance.now() - progressRef.current * def.durationMs;
     const tick = (now: number) => {
       const progress = ((now - start) / def.durationMs) % 1;
+      progressRef.current = progress;
       drawEffectAt(ctx, def, progress, half, half);
       rafId = requestAnimationFrame(tick);
     };
