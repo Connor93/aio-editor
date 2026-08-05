@@ -95,7 +95,14 @@ const SPECIALS: Record<string, VfxDef> = {
 };
 
 export function buildRegistry(): Record<string, VfxDef> {
-  const registry: Record<string, VfxDef> = {};
+  // Object.create(null), NOT {} — effect names are free-form, server-authored
+  // strings looked up directly as keys, so a plain object literal would make
+  // `registry['constructor']`, `['toString']`, `['valueOf']`, `['__proto__']`
+  // and friends return truthy inherited values that pass an `if (!def)`
+  // guard and then blow up on `KINDS[def.kind]`. A null-prototype map has no
+  // inherited keys, so every unknown name — typo, empty string, or a
+  // prototype key — misses cleanly and degrades to "no effect".
+  const registry: Record<string, VfxDef> = Object.create(null);
 
   // Matrix: every kind x every element x every size.
   for (const kind of Object.keys(KINDS) as ShapeKind[]) {

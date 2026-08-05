@@ -12,6 +12,31 @@
 // ctx.save()/ctx.restore(), and no ctx.translate()/ctx.rotate() (which would
 // leak into a combo layer drawn right after). Every coordinate is instead
 // computed directly from `cx`/`cy` via cos/sin offsets.
+//
+// Corollary of that shared-context convention: a draw function that sets a
+// ctx property to a NON-default value which other kinds don't set for
+// themselves must restore the canvas default before returning, or it leaks
+// into the combo layer painted immediately after it. Today that's only
+// `lineCap` (drawSlash/drawSpiral want 'round'; every other stroking kind
+// relies on the 'butt' default) — both reset it. `lineWidth`, `globalAlpha`,
+// `strokeStyle` and `fillStyle` need no such treatment: every kind that
+// strokes or fills assigns them itself.
+//
+// ── Frame budget ────────────────────────────────────────────────────────
+// Every kind is rasterized into a FRAME_SIZE (128px) square drawn centred,
+// so anything painted more than 64px from the centre on either axis is hard
+// clipped to a square edge. The largest registered `sizeScale` is 1.5 (the
+// `-lg` variants), which means each kind's geometry constants are tuned so
+// that its worst-case Chebyshev extent — max(|dx|, |dy|) over every painted
+// pixel, including half the stroke width — stays at or below 62px at
+// sizeScale 1.5, i.e. roughly 41px at base size. Two extra notes:
+//   * `sizeScale` multiplies distances AND the size-proportional stroke
+//     widths, so sm/base/lg stay visibly distinct (0.6x / 1.0x / 1.5x).
+//   * `beam-pop` and `rain` are directional and would blow the vertical
+//     budget if anchored naively at `cy`; both are anchored so their
+//     travel band is centred in the frame instead (see their comments).
+// If you change a constant below, re-verify with an instrumented context —
+// eyeballing a 128px tile does not catch a 3px overrun.
 
 import type { ShapeKind, VfxDef } from './types';
 
@@ -66,7 +91,8 @@ function drawRing(
   cx: number,
   cy: number,
 ): void {
-  const radius = progress * 48 * def.sizeScale;
+  // 40 * 1.5 + lineWidth/2 = 61.5px extent at -lg.
+  const radius = progress * 40 * def.sizeScale;
   ctx.globalAlpha = 1 - progress;
   ctx.lineWidth = 3;
   ctx.strokeStyle = toHex(def.color);
@@ -82,7 +108,8 @@ function drawDisc(
   cx: number,
   cy: number,
 ): void {
-  const radius = progress * 44 * def.sizeScale;
+  // Filled, so no stroke padding on the outer edge: 41 * 1.5 = 61.5px at -lg.
+  const radius = progress * 41 * def.sizeScale;
 
   ctx.globalAlpha = 0.6 * (1 - progress);
   ctx.fillStyle = toHex(def.color);
@@ -107,7 +134,8 @@ function drawSparkBurst(
   cy: number,
 ): void {
   const sparkCount = 14;
-  const length = progress * 46 * def.sizeScale;
+  // 40 * 1.5 + lineWidth/2 = 61.0px extent at -lg.
+  const length = progress * 40 * def.sizeScale;
   const inner = length * 0.2;
 
   ctx.globalAlpha = 1 - progress;
@@ -138,7 +166,9 @@ function drawSlash(
   cx: number,
   cy: number,
 ): void {
-  const radius = 42 * def.sizeScale;
+  // The taper's half-width stacks on the arc radius, so both shrink together:
+  // 36 * 1.5 + (1.5 + (23/24) * 8 * 1.5) / 2 = 60.5px extent at -lg.
+  const radius = 36 * def.sizeScale;
   const startAngle = -0.6 * Math.PI;
   const endAngle = startAngle + progress * 1.2 * Math.PI;
   const segments = 24;
@@ -153,11 +183,15 @@ function drawSlash(
     const a0 = startAngle + (endAngle - startAngle) * t0;
     const a1 = startAngle + (endAngle - startAngle) * t1;
     // Taper: thin near the tail (t0 ~ 0), thick near the leading edge.
-    ctx.lineWidth = 1.5 + t0 * 9 * def.sizeScale;
+    ctx.lineWidth = 1.5 + t0 * 8 * def.sizeScale;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, a0, a1);
     ctx.stroke();
   }
+
+  // Restore the canvas default — a combo layer is drawn straight after this
+  // inside the same save/restore (see the shared-context note up top).
+  ctx.lineCap = 'butt';
 }
 
 // Spiral polyline traced from the center outward: theta = t*6π, r = t*46*scale
@@ -179,7 +213,8 @@ function drawSpiral(
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * progress;
     const theta = t * 6 * Math.PI;
-    const r = t * 46 * def.sizeScale;
+    // 39 * 1.5 + lineWidth/2 = 60.4px extent at -lg.
+    const r = t * 39 * def.sizeScale;
     const x = cx + Math.cos(theta) * r;
     const y = cy + Math.sin(theta) * r;
     if (i === 0) {
@@ -189,6 +224,10 @@ function drawSpiral(
     }
   }
   ctx.stroke();
+
+  // Restore the canvas default — a combo layer is drawn straight after this
+  // inside the same save/restore (see the shared-context note up top).
+  ctx.lineCap = 'butt';
 }
 
 // A small 4-point sparkle glyph (a diamond with a long + short axis) — the
@@ -227,7 +266,9 @@ function drawSparkle(
 
   for (let i = 0; i < count; i++) {
     const angle = i * 2.399;
-    const dist = indexFrac(i * 7 + 3) * 42 * def.sizeScale;
+    // A twinkle's own half-size stacks on its scatter distance, so both
+    // shrink together: 36 * 1.5 * maxFrac + 7.5 * 1.5 = 60.0px at -lg.
+    const dist = indexFrac(i * 7 + 3) * 36 * def.sizeScale;
     const x = cx + Math.cos(angle) * dist;
     const y = cy + Math.sin(angle) * dist;
 
@@ -237,7 +278,7 @@ function drawSparkle(
       continue;
     }
     ctx.globalAlpha = s;
-    drawStar4(ctx, x, y, s * 9 * def.sizeScale);
+    drawStar4(ctx, x, y, s * 7.5 * def.sizeScale);
   }
 }
 
@@ -250,7 +291,10 @@ function drawNova(
   cx: number,
   cy: number,
 ): void {
-  const flashRadius = 26 * def.sizeScale * (1 - progress * 0.3);
+  // Flash and shockfront shrink in step (26/56 -> 19/40) so the "small hot
+  // core inside a wide ring" read is unchanged: 40 * 1.5 + lineWidth/2 =
+  // 61.0px extent at -lg.
+  const flashRadius = 19 * def.sizeScale * (1 - progress * 0.3);
   const gradient = ctx.createRadialGradient(
     cx,
     cy,
@@ -268,7 +312,7 @@ function drawNova(
   ctx.arc(cx, cy, Math.max(flashRadius, 0.01), 0, Math.PI * 2);
   ctx.fill();
 
-  const ringRadius = progress * 56 * def.sizeScale;
+  const ringRadius = progress * 40 * def.sizeScale;
   ctx.globalAlpha = (1 - progress) * 0.85;
   ctx.lineWidth = 2;
   ctx.strokeStyle = toHex(def.color);
@@ -285,7 +329,8 @@ function drawShockwave(
   cx: number,
   cy: number,
 ): void {
-  const rx = Math.max(progress * 50 * def.sizeScale, 0.01);
+  // 40 * 1.5 + lineWidth/2 = 61.5px extent at -lg (rx is the wide axis).
+  const rx = Math.max(progress * 40 * def.sizeScale, 0.01);
   const ry = rx * 0.5;
 
   ctx.globalAlpha = 1 - progress;
@@ -296,8 +341,18 @@ function drawShockwave(
   ctx.stroke();
 }
 
-// A vertical pillar rising from `cy`: a gradient-filled rect fading to
-// transparent at its tip.
+// A vertical pillar rising from a baseline below `cy`: a gradient-filled
+// rect fading to transparent at its tip.
+//
+// SPECIAL HANDLING (frame budget): a pillar anchored at `cy` grows in ONE
+// direction, so it can only ever use the top half of the frame — the old
+// 80-unit height overflowed even at base size (80 > 64). Rather than halve
+// the pillar, the baseline moves down to `cy + 40 * sizeScale` so the pillar
+// spans the frame's full vertical range symmetrically: at -lg it runs from
+// cy+60 down-to-up to cy-60, i.e. exactly ±60px. The pillar keeps its full
+// original height and gradient; only its anchor within the tile changed.
+// Reads better in-game too — the beam now starts below the target's centre
+// (around a standing sprite's feet) and rises past it.
 function drawBeamPop(
   ctx: CanvasRenderingContext2D,
   progress: number,
@@ -305,11 +360,12 @@ function drawBeamPop(
   cx: number,
   cy: number,
 ): void {
+  const baseY = cy + 40 * def.sizeScale;
   const height = progress * 80 * def.sizeScale;
   const width = 9 * def.sizeScale;
-  const top = cy - height;
+  const top = baseY - height;
 
-  const gradient = ctx.createLinearGradient(cx, cy, cx, top);
+  const gradient = ctx.createLinearGradient(cx, baseY, cx, top);
   gradient.addColorStop(0, toRgba(def.color, 1));
   gradient.addColorStop(1, toRgba(def.color, 0));
 
@@ -327,7 +383,10 @@ function drawImplode(
   cx: number,
   cy: number,
 ): void {
-  const radius = (1 - progress) * 48 * def.sizeScale;
+  // The converging particles sit ON the ring, so their own radius stacks on
+  // it: 39 * 1.5 + 2 * 1.5 = 61.5px extent at -lg (the ring's own
+  // lineWidth/2 of 1.5 is smaller than the 3px particle, so it doesn't bind).
+  const radius = (1 - progress) * 39 * def.sizeScale;
 
   ctx.globalAlpha = 0.25 + progress * 0.75;
   ctx.lineWidth = 3;
@@ -390,8 +449,19 @@ function drawRain(
   cy: number,
 ): void {
   const count = 12;
-  const spread = 44 * def.sizeScale;
-  const streakLen = 16 * def.sizeScale;
+  // SPECIAL HANDLING (frame budget): the old code reused one `spread` for
+  // both axes AND for the fall distance, which made the vertical travel 2.6x
+  // the horizontal half-width — 105px at -lg, overflowing even at base size.
+  // The three are now independent so the fall band can be centred on `cy`:
+  //   horizontal:  40 * 1.5 + lineWidth/2      = 61.0px at -lg
+  //   top of run:  (28 + 12) * 1.5 + lw/2      = 61.0px at -lg
+  //   end of run:  (68 - 28) * 1.5 + lw/2      = 61.0px at -lg
+  // Same 12 staggered streaks falling past the centre and fading out; they
+  // just travel a shorter, on-canvas distance.
+  const spread = 40 * def.sizeScale;
+  const streakLen = 12 * def.sizeScale;
+  const fallTop = -28 * def.sizeScale;
+  const fallSpan = 68 * def.sizeScale;
 
   ctx.strokeStyle = toHex(def.color);
   ctx.lineWidth = 2;
@@ -400,7 +470,7 @@ function drawRain(
     const x = cx + (indexFrac(i) - 0.5) * spread * 2;
     const stagger = indexFrac(i + 41);
     const localP = (progress + stagger) % 1;
-    const y = cy - spread + localP * spread * 2.6;
+    const y = cy + fallTop + localP * fallSpan;
 
     ctx.globalAlpha = 1 - localP;
     ctx.beginPath();
@@ -421,7 +491,9 @@ function drawChains(
 ): void {
   const chainCount = 3;
   const segments = 5;
-  const length = 46 * def.sizeScale * Math.min(1, progress * 1.5);
+  // Length and jag shrink together to keep the zigzag's amplitude-to-reach
+  // ratio: 40 * 1.5 + jag + lineWidth/2 = 61.9px extent at -lg.
+  const length = 40 * def.sizeScale * Math.min(1, progress * 1.5);
 
   ctx.strokeStyle = toHex(def.color);
   ctx.lineWidth = 2;
@@ -442,7 +514,7 @@ function drawChains(
     for (let s = 1; s <= segments; s++) {
       const t = s / segments;
       const along = t * length;
-      const jag = (indexFrac(c * 17 + s * 11) - 0.5) * 10 * def.sizeScale;
+      const jag = (indexFrac(c * 17 + s * 11) - 0.5) * 9 * def.sizeScale;
       const x = cx + dirX * along + perpX * jag;
       const y = cy + dirY * along + perpY * jag;
       ctx.lineTo(x, y);
@@ -460,7 +532,8 @@ function drawOrbit(
   cy: number,
 ): void {
   const count = 5;
-  const radius = 40 * def.sizeScale;
+  // Each dot's own radius stacks on the orbit: (37 + 4) * 1.5 = 61.5px at -lg.
+  const radius = 37 * def.sizeScale;
 
   ctx.fillStyle = toHex(def.color);
   ctx.globalAlpha = 1 - progress * 0.2;
@@ -485,8 +558,10 @@ function drawBurstLines(
   cy: number,
 ): void {
   const count = 16;
-  const maxLen = 50 * def.sizeScale;
-  const inner = 6 * def.sizeScale;
+  // Lines start at `inner` and run out to inner + maxLen, so the two stack:
+  // (4 + 36) * 1.5 + lineWidth/2 = 60.75px extent at -lg.
+  const maxLen = 36 * def.sizeScale;
+  const inner = 4 * def.sizeScale;
   const lenFactor = Math.sin(Math.min(progress * 1.6, 1) * Math.PI * 0.5);
 
   ctx.strokeStyle = toHex(def.color);
