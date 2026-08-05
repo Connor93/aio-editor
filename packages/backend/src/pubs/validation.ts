@@ -13,6 +13,7 @@ import shopsSchema from "../schemas/shops.json" with { type: "json" };
 import skillMastersSchema from "../schemas/skill_masters.json" with { type: "json" };
 import skillsSchema from "../schemas/skills.json" with { type: "json" };
 import spellsSchema from "../schemas/spells.json" with { type: "json" };
+import statusesSchema from "../schemas/statuses.json" with { type: "json" };
 import zonesSchema from "../schemas/zones.json" with { type: "json" };
 
 // Single source of truth — `validators` is derived from `rawSchemas` so a
@@ -30,6 +31,7 @@ const rawSchemas: Record<string, object> = {
   shops: shopsSchema,
   skill_masters: skillMastersSchema,
   skills: skillsSchema,
+  statuses: statusesSchema,
   spells: spellsSchema,
   zones: zonesSchema,
 };

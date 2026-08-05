@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/statuses.json",
+  "title": "Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "title": "ID" },
+    "name": { "type": "string", "minLength": 1 },
+    "icon_id": { "type": "string", "x-aio-suggest": [] },
+    "is_debuff": { "type": "boolean", "default": false },
+    "show_timer": { "type": "boolean", "default": true },
+    "default_duration_ms": { "type": "integer", "minimum": 0, "default": 0,
+      "description": "Duration in milliseconds. 0 = permanent." },
+    "max_stacks": { "type": "integer", "minimum": 1, "default": 1 },
+    "stack_rule": { "type": "string", "default": "refresh_duration",
+      "enum": ["refresh_duration", "add_stacks", "independent", "ignore_if_present"],
+      "x-aio-options": [
+        { "value": "refresh_duration", "label": "Refresh duration" },
+        { "value": "add_stacks", "label": "Add stacks" },
+        { "value": "independent", "label": "Independent" },
+        { "value": "ignore_if_present", "label": "Ignore if present" } ] },
+    "modifiers": { "type": "array", "items": { "$ref": "#/definitions/effect" } },
+    "triggers": { "type": "array", "items": { "$ref": "#/definitions/trigger" } },
+    "ticks": { "$ref": "#/definitions/tick" },
+    "control": { "$ref": "#/definitions/controlFlags" },
+    "upkeep": { "$ref": "#/definitions/upkeep" }
+  },
+  "definitions": {
+    "element": { "type": "string", "default": "None",
+      "enum": ["None", "Fire", "Water", "Earth", "Wind", "Light", "Dark"],
+      "x-aio-options": [
+      { "value": "None", "label": "None" }, { "value": "Fire", "label": "Fire" },
+      { "value": "Water", "label": "Water" }, { "value": "Earth", "label": "Earth" },
+      { "value": "Wind", "label": "Wind" }, { "value": "Light", "label": "Light" },
+      { "value": "Dark", "label": "Dark" } ] },
+    "coreStat": { "type": "string", "default": "str",
+      "enum": ["str", "int", "wis", "agi", "con", "cha"],
+      "x-aio-options": [
+      { "value": "str", "label": "STR" }, { "value": "int", "label": "INT" },
+      { "value": "wis", "label": "WIS" }, { "value": "agi", "label": "AGI" },
+      { "value": "con", "label": "CON" }, { "value": "cha", "label": "CHA" } ] },
+    "scalingTerm": {
+      "oneOf": [
+        { "type": "object", "title": "Attack power", "additionalProperties": false, "required": ["source", "coefficient"],
+          "properties": { "source": { "const": "attack_power" }, "coefficient": { "type": "number", "default": 1 } } },
+        { "type": "object", "title": "Core stat", "additionalProperties": false, "required": ["source", "stat", "coefficient"],
+          "properties": { "source": { "const": "stat" }, "stat": { "$ref": "#/definitions/coreStat" }, "coefficient": { "type": "number", "default": 1 } } },
+        { "type": "object", "title": "Level", "additionalProperties": false, "required": ["source", "coefficient"],
+          "properties": { "source": { "const": "level" }, "coefficient": { "type": "number", "default": 1 } } },
+        { "type": "object", "title": "Spell power", "additionalProperties": false, "required": ["source", "coefficient"],
+          "properties": { "source": { "const": "spell_power" }, "coefficient": { "type": "number", "default": 1 } } },
+        { "type": "object", "title": "Healing power", "additionalProperties": false, "required": ["source", "coefficient"],
+          "properties": { "source": { "const": "healing_power" }, "coefficient": { "type": "number", "default": 1 } } }
+      ],
+      "discriminator": { "propertyName": "source" }
+    },
+    "skillAction": {
+      "oneOf": [
+        { "type": "object", "title": "Deal damage", "additionalProperties": false, "required": ["action"],
+          "properties": {
+            "action": { "const": "deal_damage" },
+            "min": { "type": "integer", "default": 0 }, "max": { "type": "integer", "default": 0 },
+            "element": { "$ref": "#/definitions/element" },
+            "scaling": { "type": "array", "items": { "$ref": "#/definitions/scalingTerm" } } } },
+        { "type": "object", "title": "Heal", "additionalProperties": false, "required": ["action"],
+          "properties": {
+            "action": { "const": "heal" },
+            "hp": { "type": "integer", "default": 0 }, "tp": { "type": "integer", "default": 0 },
+            "scaling": { "type": "array", "items": { "$ref": "#/definitions/scalingTerm" } } } },
+        { "type": "object", "title": "Apply status", "additionalProperties": false, "required": ["action", "status_id"],
+          "properties": {
+            "action": { "const": "apply_status" },
+            "status_id": { "type": "string", "x-aio-ref": { "type": "statuses", "by": "filename-stem" } },
+            "to": { "type": "string", "default": "self", "enum": ["self", "target"], "x-aio-options": [
+              { "value": "self", "label": "Caster (self)" }, { "value": "target", "label": "Enemy target" } ] } } }
+      ],
+      "discriminator": { "propertyName": "action" }
+    },
+    "statTarget": { "type": "string", "default": "damage_dealt",
+      "enum": [
+        "str", "int", "wis", "agi", "con", "cha",
+        "max_hp", "max_tp", "max_sp", "hp_regen", "tp_regen", "sp_regen",
+        "damage_dealt", "damage_taken", "accuracy", "evasion", "armor",
+        "crit_chance", "crit_damage", "crit_damage_taken", "crit_resistance",
+        "attack_speed", "move_speed",
+        "damage_dealt_fire", "damage_dealt_water", "damage_dealt_earth", "damage_dealt_wind", "damage_dealt_light", "damage_dealt_dark",
+        "damage_taken_fire", "damage_taken_water", "damage_taken_earth", "damage_taken_wind", "damage_taken_light", "damage_taken_dark",
+        "healing_dealt", "healing_received",
+        "xp_gain", "gold_gain", "rep_gain", "drop_chance", "magic_find",
+        "slow_resistance", "poison_resistance", "root_resistance",
+        "status_duration_self", "status_duration_dealt",
+        "cooldown_reduction", "mana_cost_reduction"
+      ],
+      "x-aio-options": [
+        {"value":"str","label":"STR"},{"value":"int","label":"INT"},{"value":"wis","label":"WIS"},
+        {"value":"agi","label":"AGI"},{"value":"con","label":"CON"},{"value":"cha","label":"CHA"},
+        {"value":"max_hp","label":"Max HP"},{"value":"max_tp","label":"Max TP"},{"value":"max_sp","label":"Max SP"},
+        {"value":"hp_regen","label":"HP regen"},{"value":"tp_regen","label":"TP regen"},{"value":"sp_regen","label":"SP regen"},
+        {"value":"damage_dealt","label":"Damage dealt"},{"value":"damage_taken","label":"Damage taken"},
+        {"value":"accuracy","label":"Accuracy"},{"value":"evasion","label":"Evasion"},{"value":"armor","label":"Armor"},
+        {"value":"crit_chance","label":"Crit chance"},{"value":"crit_damage","label":"Crit damage"},
+        {"value":"crit_damage_taken","label":"Crit damage taken"},{"value":"crit_resistance","label":"Crit resistance"},
+        {"value":"attack_speed","label":"Attack speed"},{"value":"move_speed","label":"Move speed"},
+        {"value":"damage_dealt_fire","label":"Damage dealt: Fire"},{"value":"damage_dealt_water","label":"Damage dealt: Water"},
+        {"value":"damage_dealt_earth","label":"Damage dealt: Earth"},{"value":"damage_dealt_wind","label":"Damage dealt: Wind"},
+        {"value":"damage_dealt_light","label":"Damage dealt: Light"},{"value":"damage_dealt_dark","label":"Damage dealt: Dark"},
+        {"value":"damage_taken_fire","label":"Damage taken: Fire"},{"value":"damage_taken_water","label":"Damage taken: Water"},
+        {"value":"damage_taken_earth","label":"Damage taken: Earth"},{"value":"damage_taken_wind","label":"Damage taken: Wind"},
+        {"value":"damage_taken_light","label":"Damage taken: Light"},{"value":"damage_taken_dark","label":"Damage taken: Dark"},
+        {"value":"healing_dealt","label":"Healing dealt"},{"value":"healing_received","label":"Healing received"},
+        {"value":"xp_gain","label":"XP gain"},{"value":"gold_gain","label":"Gold gain"},{"value":"rep_gain","label":"Rep gain"},
+        {"value":"drop_chance","label":"Drop chance"},{"value":"magic_find","label":"Magic find"},
+        {"value":"slow_resistance","label":"Slow resistance"},{"value":"poison_resistance","label":"Poison resistance"},
+        {"value":"root_resistance","label":"Root resistance"},{"value":"status_duration_self","label":"Status duration (self)"},
+        {"value":"status_duration_dealt","label":"Status duration (dealt)"},
+        {"value":"cooldown_reduction","label":"Cooldown reduction"},{"value":"mana_cost_reduction","label":"Mana cost reduction"} ] },
+
+    "effectScalingSource": {
+      "oneOf": [
+        {"type":"object","title":"Rep in zone","additionalProperties":false,"required":["type","zone_id"],
+          "properties":{"type":{"const":"rep_in_zone"},"zone_id":{"type":"integer","default":0}}},
+        {"type":"object","title":"HP missing","additionalProperties":false,"required":["type"],
+          "properties":{"type":{"const":"self_hp_missing"}}},
+        {"type":"object","title":"HP current","additionalProperties":false,"required":["type"],
+          "properties":{"type":{"const":"self_hp_current"}}},
+        {"type":"object","title":"TP missing","additionalProperties":false,"required":["type"],
+          "properties":{"type":{"const":"self_tp_missing"}}},
+        {"type":"object","title":"TP current","additionalProperties":false,"required":["type"],
+          "properties":{"type":{"const":"self_tp_current"}}},
+        {"type":"object","title":"Player level","additionalProperties":false,"required":["type"],
+          "properties":{"type":{"const":"player_level"}}}
+      ], "discriminator": { "propertyName": "type" } },
+
+    "effectValue": {
+      "oneOf": [
+        { "type": "number", "title": "Literal", "default": 0 },
+        { "type": "object", "title": "Scaling", "additionalProperties": false, "required": ["per","source"],
+          "properties": { "per": { "type": "number", "default": 0 }, "source": { "$ref": "#/definitions/effectScalingSource" } } }
+      ] },
+
+    "condition": {
+      "oneOf": [
+        {"type":"object","title":"Target type","additionalProperties":false,"required":["type","value"],
+          "properties":{"type":{"const":"target_type"},"value":{"type":"string"}}},
+        {"type":"object","title":"Current zone","additionalProperties":false,"required":["type","zone_id"],
+          "properties":{"type":{"const":"current_zone"},"zone_id":{"type":"integer","default":0}}},
+        {"type":"object","title":"Damage element","additionalProperties":false,"required":["type","element"],
+          "properties":{"type":{"const":"damage_element"},"element":{"$ref":"#/definitions/element"}}},
+        {"type":"object","title":"Self HP above %","additionalProperties":false,"required":["type","pct"],
+          "properties":{"type":{"const":"self_hp_above_pct"},"pct":{"type":"integer","minimum":0,"maximum":100,"default":50}}},
+        {"type":"object","title":"Self HP below %","additionalProperties":false,"required":["type","pct"],
+          "properties":{"type":{"const":"self_hp_below_pct"},"pct":{"type":"integer","minimum":0,"maximum":100,"default":50}}},
+        {"type":"object","title":"Self TP above %","additionalProperties":false,"required":["type","pct"],
+          "properties":{"type":{"const":"self_tp_above_pct"},"pct":{"type":"integer","minimum":0,"maximum":100,"default":50}}},
+        {"type":"object","title":"Self TP below %","additionalProperties":false,"required":["type","pct"],
+          "properties":{"type":{"const":"self_tp_below_pct"},"pct":{"type":"integer","minimum":0,"maximum":100,"default":50}}},
+        {"type":"object","title":"Weapon kind","additionalProperties":false,"required":["type","kind"],
+          "properties":{"type":{"const":"weapon_kind"},"kind":{"type":"string"}}},
+        {"type":"object","title":"Equipped offhand","additionalProperties":false,"required":["type","kind"],
+          "properties":{"type":{"const":"equipped_offhand"},"kind":{"type":"string"}}}
+      ], "discriminator": { "propertyName": "type" } },
+
+    "effect": {
+      "oneOf": [
+        {"type":"object","title":"Flat","additionalProperties":false,"required":["kind","target","value"],
+          "properties":{"kind":{"const":"flat"},"target":{"$ref":"#/definitions/statTarget"},
+            "value":{"$ref":"#/definitions/effectValue"},"when":{"$ref":"#/definitions/condition"}}},
+        {"type":"object","title":"Percent additive","additionalProperties":false,"required":["kind","target","value"],
+          "properties":{"kind":{"const":"percent_additive"},"target":{"$ref":"#/definitions/statTarget"},
+            "value":{"$ref":"#/definitions/effectValue"},"when":{"$ref":"#/definitions/condition"}}},
+        {"type":"object","title":"Percent multiplicative","additionalProperties":false,"required":["kind","target","value"],
+          "properties":{"kind":{"const":"percent_multiplicative"},"target":{"$ref":"#/definitions/statTarget"},
+            "value":{"$ref":"#/definitions/effectValue"},"when":{"$ref":"#/definitions/condition"}}}
+      ], "discriminator": { "propertyName": "kind" } },
+
+    "trigger": { "type": "object", "additionalProperties": false, "required": ["on"],
+      "properties": {
+        "on": { "type": "string", "default": "on_hit",
+          "enum": ["on_hit", "on_crit", "on_kill", "on_take_damage"],
+          "x-aio-options": [
+          {"value":"on_hit","label":"On hit"},{"value":"on_crit","label":"On crit"},
+          {"value":"on_kill","label":"On kill"},{"value":"on_take_damage","label":"On take damage"} ] },
+        "chance": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "consume": { "type": "boolean", "default": false },
+        "actions": { "type": "array", "items": { "$ref": "#/definitions/skillAction" } } } },
+
+    "tick": { "type": "object", "additionalProperties": false, "required": ["interval_ms","action"],
+      "properties": { "interval_ms": { "type": "integer", "minimum": 0, "default": 1000 },
+        "action": { "$ref": "#/definitions/skillAction" } } },
+
+    "upkeep": { "type": "object", "additionalProperties": false,
+      "properties": { "hp": { "type": "integer", "default": 0 }, "tp": { "type": "integer", "default": 0 },
+        "interval_ms": { "type": "integer", "minimum": 0, "default": 1000 } } },
+
+    "controlFlags": { "type": "object", "additionalProperties": false,
+      "properties": { "stun": { "type": "boolean", "default": false }, "root": { "type": "boolean", "default": false },
+        "silence": { "type": "boolean", "default": false }, "disarm": { "type": "boolean", "default": false } } }
+  }
+}

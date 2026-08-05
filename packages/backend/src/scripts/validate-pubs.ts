@@ -5,6 +5,7 @@ import { join } from "node:path";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
 import skillsSchema from "../schemas/skills.json" with { type: "json" };
+import statusesSchema from "../schemas/statuses.json" with { type: "json" };
 
 const PUB_ROOT = process.env.PUB_DATA_DIR ?? "/Users/cfraser/Projects/reoserv/data/pub";
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -31,16 +32,28 @@ function pubs(type: string): string[] {
 
 // Real pubs must all validate.
 check("skills", skillsSchema, true, pubs("skills"));
+check("statuses", statusesSchema, true, pubs("statuses"));
 
-// Malformed skills must be rejected (write temp objects inline).
-const validate = ajv.compile(skillsSchema);
-function expectReject(label: string, obj: unknown) {
-  if (validate(obj)) { failures++; console.error(`[skills] should reject: ${label}`); }
+function rejecter(type: string, schema: object) {
+  const validate = ajv.compile(schema);
+  return (label: string, obj: unknown) => {
+    if (validate(obj)) { failures++; console.error(`[${type}] should reject: ${label}`); }
+  };
 }
-expectReject("unknown action tag", { id: "x", name: "X", actions: [{ action: "nope" }] });
-expectReject("bad element case", { id: "x", name: "X", actions: [{ action: "deal_damage", element: "fire" }] });
-expectReject("range over 252", { id: "x", name: "X", range: 999 });
-expectReject("missing action tag", { id: "x", name: "X", actions: [{ min: 5 }] });
+
+// Malformed skills must be rejected.
+const rejectSkill = rejecter("skills", skillsSchema);
+rejectSkill("unknown action tag", { id: "x", name: "X", actions: [{ action: "nope" }] });
+rejectSkill("bad element case", { id: "x", name: "X", actions: [{ action: "deal_damage", element: "fire" }] });
+rejectSkill("range over 252", { id: "x", name: "X", range: 999 });
+rejectSkill("missing action tag", { id: "x", name: "X", actions: [{ min: 5 }] });
+
+// Malformed statuses must be rejected.
+const rejectStatus = rejecter("statuses", statusesSchema);
+rejectStatus("unknown modifier kind", { id: "x", name: "X", modifiers: [{ kind: "nope", target: "armor", value: 1 }] });
+rejectStatus("pct over 100", { id: "x", name: "X", triggers: [{ on: "on_take_damage", actions: [] }], modifiers: [{ kind: "flat", target: "armor", value: 1, when: { type: "self_hp_below_pct", pct: 150 } }] });
+rejectStatus("unknown stack_rule", { id: "x", name: "X", stack_rule: "nope" });
+rejectStatus("chance over 1", { id: "x", name: "X", triggers: [{ on: "on_hit", chance: 2 }] });
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("validate-pubs: all checks passed");
