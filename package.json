@@ -10,6 +10,7 @@
     "dev:backend": "npm run dev --workspace packages/backend",
     "dev:frontend": "npm run dev --workspace packages/frontend",
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "validate:skeletons": "tsx scripts/skeleton-check.ts"
   }
 }
