@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRefs } from "../refs/RefsContext";
 import { type JsonSchema, makeDefault, resolveRef } from "./schema";
 import { ICON_SUGGESTIONS, VFX_SUGGESTIONS } from "./suggest-values";
+import { VfxPreview } from "./VfxPreview";
 
 /** Parse the leading numeric portion of a filename like "0042.json" → 42.
  *  Returns null for filenames that don't start with digits. */
@@ -1298,19 +1299,28 @@ function StringField({ schema, value, onChange, path, label, required, compact }
   );
 }
 
+/** True for `cast_vfx`/`impact_vfx` leaf fields — the only `SuggestField`s
+ *  that get a live `VfxPreview`. Shared with `suggestionsForPath` so the two
+ *  can't drift apart on which suffixes count as "a vfx field". */
+function isVfxPath(path: string): boolean {
+  return path.endsWith("cast_vfx") || path.endsWith("impact_vfx");
+}
+
 /** Resolves the vendored suggestion list for a field from its path when the
  *  schema doesn't supply an explicit `x-aio-suggest` list (i.e. the schema
  *  only marks the field with an empty `[]` to route it here). Paths look
  *  like `/actions/0/icon_id` or `/actions/0/cast_vfx`. */
 function suggestionsForPath(path: string): string[] {
   if (path.endsWith("icon_id")) return ICON_SUGGESTIONS;
-  if (path.endsWith("cast_vfx") || path.endsWith("impact_vfx")) return VFX_SUGGESTIONS;
+  if (isVfxPath(path)) return VFX_SUGGESTIONS;
   return [];
 }
 
 /** Free-text string input with a `<datalist>` of suggested values — used for
  *  icon/vfx string refs. Unknown values are always accepted on save; the
- *  datalist is authoring convenience only, not validation. */
+ *  datalist is authoring convenience only, not validation. `cast_vfx`/
+ *  `impact_vfx` fields additionally get a live animated preview beneath the
+ *  input (icon_id does not — icons have no vfx-engine def to render). */
 function SuggestField({ schema, value, onChange, path, label, required, compact }: CommonProps) {
   const listId = `suggest-${path}`;
   const explicit = schema["x-aio-suggest"] ?? [];
@@ -1332,6 +1342,7 @@ function SuggestField({ schema, value, onChange, path, label, required, compact 
           <option key={s} value={s} />
         ))}
       </datalist>
+      {isVfxPath(path) && <VfxPreview value={current} />}
     </label>
   );
 }
