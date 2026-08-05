@@ -1,6 +1,6 @@
 // Standalone schema sanity check (no unit-test runner in this repo).
 // Run: npx tsx src/scripts/validate-pubs.ts  (from packages/backend)
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
@@ -27,6 +27,13 @@ function check(type: string, schema: object, expectValid: boolean, files: string
 
 function pubs(type: string): string[] {
   const dir = join(PUB_ROOT, type);
+  // The reoserv pub volume lives in a sibling repo (or PUB_DATA_DIR). Off that
+  // machine / in CI it may be absent — skip the real-pub sweep with a notice
+  // rather than crash; the inline reject/accept + skeleton checks still run.
+  if (!existsSync(dir)) {
+    console.warn(`[${type}] pub dir not found (${dir}); skipping real-pub validation. Set PUB_DATA_DIR to enable.`);
+    return [];
+  }
   return readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => join(dir, f));
 }
 

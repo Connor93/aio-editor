@@ -59,7 +59,7 @@ export function SchemaField(props: CommonProps) {
     return <WornGfxField {...props} schema={resolved} />;
   }
 
-  if (resolved.oneOf) {
+  if (resolved.oneOf?.length) {
     return <OneOfField {...props} schema={resolved} />;
   }
 
