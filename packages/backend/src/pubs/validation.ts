@@ -11,6 +11,7 @@ import rarityWeightsSchema from "../schemas/rarity_weights.json" with { type: "j
 import reputationTiersSchema from "../schemas/reputation_tiers.json" with { type: "json" };
 import shopsSchema from "../schemas/shops.json" with { type: "json" };
 import skillMastersSchema from "../schemas/skill_masters.json" with { type: "json" };
+import skillsSchema from "../schemas/skills.json" with { type: "json" };
 import spellsSchema from "../schemas/spells.json" with { type: "json" };
 import zonesSchema from "../schemas/zones.json" with { type: "json" };
 
@@ -28,6 +29,7 @@ const rawSchemas: Record<string, object> = {
   reputation_tiers: reputationTiersSchema,
   shops: shopsSchema,
   skill_masters: skillMastersSchema,
+  skills: skillsSchema,
   spells: spellsSchema,
   zones: zonesSchema,
 };

@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aio-editor/schemas/skills.json",
+  "title": "Skill",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "title": "ID" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "icon_id": { "type": "string", "x-aio-suggest": [] },
+    "cost": { "type": "object", "additionalProperties": false,
+      "properties": { "hp": { "type": "integer", "default": 0 }, "tp": { "type": "integer", "default": 0 } } },
+    "cooldown_ms": { "type": "integer", "minimum": 0, "default": 0 },
+    "target": { "type": "string", "default": "self_only", "enum": ["self_only", "single_enemy"], "x-aio-options": [
+      { "value": "self_only", "label": "Self only" },
+      { "value": "single_enemy", "label": "Single enemy" } ] },
+    "range": { "type": "integer", "minimum": 0, "maximum": 252, "default": 0,
+      "description": "Cast range in tiles (0 = use weapon range)." },
+    "kind": { "type": "string", "default": "active", "enum": ["active", "toggle"], "x-aio-options": [
+      { "value": "active", "label": "Active" },
+      { "value": "toggle", "label": "Toggle" } ] },
+    "on_status": { "type": "string", "x-aio-ref": { "type": "statuses", "by": "filename-stem" },
+      "description": "Status flipped by a toggle skill." },
+    "cast_vfx": { "type": "string", "x-aio-suggest": [] },
+    "impact_vfx": { "type": "string", "x-aio-suggest": [] },
+    "actions": { "type": "array", "items": { "$ref": "#/definitions/skillAction" } }
+  },
+  "definitions": {
+    "element": { "type": "string", "default": "None",
+      "enum": ["None", "Fire", "Water", "Earth", "Wind", "Light", "Dark"],
+      "x-aio-options": [
+      { "value": "None", "label": "None" }, { "value": "Fire", "label": "Fire" },
+      { "value": "Water", "label": "Water" }, { "value": "Earth", "label": "Earth" },
+      { "value": "Wind", "label": "Wind" }, { "value": "Light", "label": "Light" },
+      { "value": "Dark", "label": "Dark" } ] },
+    "coreStat": { "type": "string", "default": "str",
+      "enum": ["str", "int", "wis", "agi", "con", "cha"],
+      "x-aio-options": [
+      { "value": "str", "label": "STR" }, { "value": "int", "label": "INT" },
+      { "value": "wis", "label": "WIS" }, { "value": "agi", "label": "AGI" },
+      { "value": "con", "label": "CON" }, { "value": "cha", "label": "CHA" } ] },
+    "scalingTerm": {
+      "oneOf": [
+        { "type": "object", "title": "Attack power", "additionalProperties": false, "required": ["source", "coefficient"],
+          "properties": { "source": { "const": "attack_power" }, "coefficient": { "type": "number", "default": 1 } } },
+        { "type": "object", "title": "Core stat", "additionalProperties": false, "required": ["source", "stat", "coefficient"],
+          "properties": { "source": { "const": "stat" }, "stat": { "$ref": "#/definitions/coreStat" }, "coefficient": { "type": "number", "default": 1 } } },
+        { "type": "object", "title": "Level", "additionalProperties": false, "required": ["source", "coefficient"],
+          "properties": { "source": { "const": "level" }, "coefficient": { "type": "number", "default": 1 } } },
+        { "type": "object", "title": "Spell power", "additionalProperties": false, "required": ["source", "coefficient"],
+          "properties": { "source": { "const": "spell_power" }, "coefficient": { "type": "number", "default": 1 } } },
+        { "type": "object", "title": "Healing power", "additionalProperties": false, "required": ["source", "coefficient"],
+          "properties": { "source": { "const": "healing_power" }, "coefficient": { "type": "number", "default": 1 } } }
+      ],
+      "discriminator": { "propertyName": "source" }
+    },
+    "skillAction": {
+      "oneOf": [
+        { "type": "object", "title": "Deal damage", "additionalProperties": false, "required": ["action"],
+          "properties": {
+            "action": { "const": "deal_damage" },
+            "min": { "type": "integer", "default": 0 }, "max": { "type": "integer", "default": 0 },
+            "element": { "$ref": "#/definitions/element" },
+            "scaling": { "type": "array", "items": { "$ref": "#/definitions/scalingTerm" } } } },
+        { "type": "object", "title": "Heal", "additionalProperties": false, "required": ["action"],
+          "properties": {
+            "action": { "const": "heal" },
+            "hp": { "type": "integer", "default": 0 }, "tp": { "type": "integer", "default": 0 },
+            "scaling": { "type": "array", "items": { "$ref": "#/definitions/scalingTerm" } } } },
+        { "type": "object", "title": "Apply status", "additionalProperties": false, "required": ["action", "status_id"],
+          "properties": {
+            "action": { "const": "apply_status" },
+            "status_id": { "type": "string", "x-aio-ref": { "type": "statuses", "by": "filename-stem" } },
+            "to": { "type": "string", "default": "self", "enum": ["self", "target"], "x-aio-options": [
+              { "value": "self", "label": "Caster (self)" }, { "value": "target", "label": "Enemy target" } ] } } }
+      ],
+      "discriminator": { "propertyName": "action" }
+    }
+  }
+}
