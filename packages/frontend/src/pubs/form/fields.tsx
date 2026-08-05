@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useRefs } from "../refs/RefsContext";
 import { type JsonSchema, makeDefault, resolveRef } from "./schema";
-import { ICON_SUGGESTIONS, VFX_SUGGESTIONS } from "./suggest-values";
+import { ICON_SUGGESTIONS } from "./suggest-values";
 import { VfxField } from "./VfxField";
 
 /** Parse the leading numeric portion of a filename like "0042.json" → 42.
@@ -1302,10 +1302,12 @@ function StringField({ schema, value, onChange, path, label, required, compact }
   );
 }
 
-/** True for `cast_vfx`/`impact_vfx` leaf fields — the ones routed to
- *  `VfxSuggestField` (shape/element/size pickers) instead of the plain
- *  `SuggestField` text input. Shared with `suggestionsForPath` so the two
- *  can't drift apart on which suffixes count as "a vfx field". */
+/** True for `cast_vfx`/`impact_vfx` leaf fields. This is the routing
+ *  predicate `SchemaField` uses to send those paths to `VfxSuggestField`
+ *  (shape/element/size pickers) instead of the plain `SuggestField` text
+ *  input — `suggestionsForPath` never sees a vfx path, since `SchemaField`
+ *  routes it away before `SuggestField` (and thus `suggestionsForPath`) is
+ *  ever reached. */
 function isVfxPath(path: string): boolean {
   return path.endsWith("cast_vfx") || path.endsWith("impact_vfx");
 }
@@ -1313,10 +1315,10 @@ function isVfxPath(path: string): boolean {
 /** Resolves the vendored suggestion list for a field from its path when the
  *  schema doesn't supply an explicit `x-aio-suggest` list (i.e. the schema
  *  only marks the field with an empty `[]` to route it here). Paths look
- *  like `/actions/0/icon_id` or `/actions/0/cast_vfx`. */
+ *  like `/actions/0/icon_id`. Never called with a vfx path — see
+ *  `isVfxPath`. */
 function suggestionsForPath(path: string): string[] {
   if (path.endsWith("icon_id")) return ICON_SUGGESTIONS;
-  if (isVfxPath(path)) return VFX_SUGGESTIONS;
   return [];
 }
 
