@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRefs } from "../refs/RefsContext";
 import { type JsonSchema, makeDefault, resolveRef } from "./schema";
 import { ICON_SUGGESTIONS, VFX_SUGGESTIONS } from "./suggest-values";
-import { VfxPreview } from "./VfxPreview";
+import { VfxField } from "./VfxField";
 
 /** Parse the leading numeric portion of a filename like "0042.json" → 42.
  *  Returns null for filenames that don't start with digits. */
@@ -45,6 +45,9 @@ export function SchemaField(props: CommonProps) {
   }
 
   if (resolved["x-aio-suggest"]) {
+    if (isVfxPath(props.path)) {
+      return <VfxSuggestField {...props} schema={resolved} />;
+    }
     return <SuggestField {...props} schema={resolved} />;
   }
 
@@ -1299,8 +1302,9 @@ function StringField({ schema, value, onChange, path, label, required, compact }
   );
 }
 
-/** True for `cast_vfx`/`impact_vfx` leaf fields — the only `SuggestField`s
- *  that get a live `VfxPreview`. Shared with `suggestionsForPath` so the two
+/** True for `cast_vfx`/`impact_vfx` leaf fields — the ones routed to
+ *  `VfxSuggestField` (shape/element/size pickers) instead of the plain
+ *  `SuggestField` text input. Shared with `suggestionsForPath` so the two
  *  can't drift apart on which suffixes count as "a vfx field". */
 function isVfxPath(path: string): boolean {
   return path.endsWith("cast_vfx") || path.endsWith("impact_vfx");
@@ -1317,10 +1321,10 @@ function suggestionsForPath(path: string): string[] {
 }
 
 /** Free-text string input with a `<datalist>` of suggested values — used for
- *  icon/vfx string refs. Unknown values are always accepted on save; the
- *  datalist is authoring convenience only, not validation. `cast_vfx`/
- *  `impact_vfx` fields additionally get a live animated preview beneath the
- *  input (icon_id does not — icons have no vfx-engine def to render). */
+ *  icon string refs (`icon_id`). `cast_vfx`/`impact_vfx` fields never reach
+ *  this component; `SchemaField` routes those to `VfxSuggestField` instead.
+ *  Unknown values are always accepted on save; the datalist is authoring
+ *  convenience only, not validation. */
 function SuggestField({ schema, value, onChange, path, label, required, compact }: CommonProps) {
   const listId = `suggest-${path}`;
   const explicit = schema["x-aio-suggest"] ?? [];
@@ -1342,8 +1346,28 @@ function SuggestField({ schema, value, onChange, path, label, required, compact 
           <option key={s} value={s} />
         ))}
       </datalist>
-      {isVfxPath(path) && <VfxPreview value={current} />}
     </label>
+  );
+}
+
+/** `cast_vfx`/`impact_vfx`. A plain <div>, not a <label>: VfxField renders three
+ *  separate controls, and a single <label> wrapping all of them would associate
+ *  the caption with whichever one the browser picks. */
+function VfxSuggestField({ schema, value, onChange, path, label, required, compact }: CommonProps) {
+  return (
+    <div className="group/field block">
+      <FieldLabel
+        label={label}
+        required={required}
+        description={schema.description}
+        path={path}
+        compact={compact}
+      />
+      <VfxField
+        value={typeof value === "string" ? value : ""}
+        onChange={(next) => onChange(next)}
+      />
+    </div>
   );
 }
 
