@@ -10,7 +10,7 @@ import {
   type VfxAxes,
   type VfxShape,
 } from "../../vfx-engine";
-import { VFX_SUGGESTIONS } from "./suggest-values";
+import { SHEET_NAMES, VFX_SUGGESTIONS } from "./suggest-values";
 import { VfxPreview } from "./VfxPreview";
 
 /** Both allocate their whole structure per call — build once at module scope,
@@ -19,10 +19,6 @@ const VFX_INDEX: Record<string, VfxAxes> = buildIndex();
 const VFX_SHAPES: VfxShape[] = buildShapes();
 const SHAPE_BY_ID = new Map(VFX_SHAPES.map((s) => [s.id, s]));
 
-/** eoweb's two sprite-sheet effects live in its vfx-manifest, NOT the engine,
- *  so they have no axes and must be listed here by hand. A third sheet means
- *  editing this array. */
-const SHEET_NAMES = ["cast-burst", "fire-impact"];
 const SHEET_PREFIX = "sheet:";
 
 const NONE_ID = "none";
