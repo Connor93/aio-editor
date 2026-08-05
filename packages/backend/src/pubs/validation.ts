@@ -31,8 +31,8 @@ const rawSchemas: Record<string, object> = {
   shops: shopsSchema,
   skill_masters: skillMastersSchema,
   skills: skillsSchema,
-  statuses: statusesSchema,
   spells: spellsSchema,
+  statuses: statusesSchema,
   zones: zonesSchema,
 };
 
