@@ -228,9 +228,11 @@ function getScratch(): {
  * frames via renderFrameCanvas above. It exists for aio-editor's VfxPreview,
  * which animates the vendored copy of this engine continuously in a live
  * `<canvas>`, compositing `behind`/`tint`/`front` with three calls per frame
- * (one per DEPTH_LAYERS entry) the same way eoweb's 3-sprite renderer does.
- * The `@vendored` tag is what stops `pnpm knip` reporting it as an unused
- * export (see knip.json).
+ * — one per layer, hardcoded rather than a loop over `DEPTH_LAYERS`, because
+ * it has to interleave a character stand-in between the `behind` and `tint`
+ * calls — the same depth order eoweb's 3-sprite renderer sandwiches around
+ * the target with. The `@vendored` tag is what stops `pnpm knip` reporting
+ * it as an unused export (see knip.json).
  */
 export function drawEffectAt(
   ctx: CanvasRenderingContext2D,

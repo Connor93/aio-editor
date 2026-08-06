@@ -640,8 +640,8 @@ function drawChains(
   const segments = 5;
   // Length unchanged; extent's binding term is length + lineWidth/2 (the jag
   // offset lands on the OTHER axis at the worst-case angle, not stacking):
-  // measured (instrumented context, not hand arithmetic) 61.75px at -lg,
-  // under the 62px budget. Was 61.00px before this task's lineWidth bump.
+  // measured 60.70px at -lg, under the 62px budget. Was 61.00px before this
+  // task's lineWidth bump.
   const length = 40 * def.sizeScale * Math.min(1, progress * 1.5);
 
   ctx.strokeStyle = base(def);
@@ -717,8 +717,8 @@ function drawBurstLines(
 ): void {
   const count = 12;
   // Lines start at `inner` and run out to inner + maxLen, so the two stack;
-  // lineWidth is the only term this task changed. Measured (instrumented
-  // context) 61.75px at -lg, under the 62px budget — was 60.75px before.
+  // lineWidth is the only term this task changed. Measured 60.00px at -lg,
+  // under the 62px budget — was 60.75px before.
   const maxLen = 36 * def.sizeScale;
   const inner = 4 * def.sizeScale;
   const lenFactor = Math.sin(Math.min(progress * 1.6, 1) * Math.PI * 0.5);
