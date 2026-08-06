@@ -68,13 +68,17 @@ type SetPieceName = 'bolt' | 'smite' | 'rockfall' | 'ring-of-fire';
 
 export type CycleKey = 1 | 2 | 3;
 
-/** [name suffix, loop count]. Bare (1 cycle) carries NO suffix, mirroring how
- *  base size does — so every existing set-piece name keeps working unchanged. */
-const CYCLES: ReadonlyArray<readonly [suffix: string, loops: CycleKey]> = [
+/** [name suffix, cycle count]. Bare (1 cycle) carries NO suffix, mirroring how
+ *  base size does — so every existing set-piece name keeps working unchanged.
+ *  Whether the count lands on `frames` or on `loops` is the shape's
+ *  `cycleMode` (see SetPieceConfig). */
+const CYCLES: ReadonlyArray<readonly [suffix: string, count: CycleKey]> = [
   ['', 1],
   ['x2', 2],
   ['x3', 3],
 ];
+
+type CycleMode = 'loop' | 'frames';
 
 interface SetPieceConfig {
   frame: FrameGeometry;
@@ -85,6 +89,15 @@ interface SetPieceConfig {
    *  of fire is not a thing anyone wants — so it keeps its fixed `loops` and
    *  offers no axis, exactly as combos offer no size. */
   hasCycles: boolean;
+  /** How the `cycles` axis is applied.
+   *  'loop'   — multiply `loops`; the same rasterised cycle repeats. No extra
+   *             textures. Correct whenever every cycle looks identical.
+   *  'frames' — multiply `frames`, keeping `loops: 1`, so every cycle is
+   *             rasterised separately and CAN differ. Costs textures linearly
+   *             in the cycle count; only use it where cycles must differ.
+   *  Inert for shapes with `hasCycles: false`, exactly as `size` is inert for
+   *  set pieces — they still declare it, for uniformity. */
+  cycleMode: CycleMode;
 }
 
 /** Element-parameterised, size-less. Descents are FAST (400ms per cycle) on
@@ -104,6 +117,7 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     loops: 1,
     frameMs: 100,
     hasCycles: true,
+    cycleMode: 'loop',
   },
   smite: {
     frame: TALL_FRAME,
@@ -111,6 +125,7 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     loops: 1,
     frameMs: 100,
     hasCycles: true,
+    cycleMode: 'loop',
   },
   rockfall: {
     frame: TALL_FRAME,
@@ -118,6 +133,7 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     loops: 1,
     frameMs: 100,
     hasCycles: true,
+    cycleMode: 'loop',
   },
   'ring-of-fire': {
     frame: GROUND_FRAME,
@@ -125,6 +141,7 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     loops: 3,
     frameMs: 100,
     hasCycles: false,
+    cycleMode: 'loop',
   },
 };
 
@@ -327,14 +344,20 @@ export function buildRegistry(): Record<string, VfxDef> {
       const variants: ReadonlyArray<readonly [string, number]> = cfg.hasCycles
         ? CYCLES
         : [['', cfg.loops]];
-      for (const [suffix, loops] of variants) {
+      for (const [suffix, count] of variants) {
+        // 'frames' mode expands the frame count and pins loops to 1 so each
+        // cycle is its own texture and can differ; 'loop' mode leaves the
+        // frame count alone and repeats. Both yield the same total duration
+        // (frames * loops * frameMs), which is why the registry assertions —
+        // not the type checker — are what catch a mis-wiring here.
+        const frameMode = cfg.cycleMode === 'frames';
         registry[`${name}-${element}${suffix ? `-${suffix}` : ''}`] = {
           kind: name,
           ramp: ELEMENTS[element],
           sizeScale: 1,
           additive: true,
-          frames: cfg.frames,
-          loops,
+          frames: frameMode ? cfg.frames * count : cfg.frames,
+          loops: frameMode ? 1 : count,
           frameMs: cfg.frameMs,
           frame: cfg.frame,
         };
