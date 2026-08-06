@@ -4,6 +4,7 @@ import {
   buildIndex,
   buildShapes,
   composeVfxName,
+  type CycleKey,
   ELEMENTS,
   type ElementKey,
   RAMP_BASE,
@@ -31,6 +32,9 @@ const ELEMENT_ORDER: ElementKey[] = [
 const SIZE_ORDER: ReadonlyArray<readonly [SizeKey, string]> = [
   ["sm", "S"], ["base", "M"], ["lg", "L"],
 ];
+const CYCLE_ORDER: ReadonlyArray<readonly [CycleKey, string]> = [
+  [1, "1×"], [2, "2×"], [3, "3×"],
+];
 
 function hex(rgb: number): string {
   return `#${rgb.toString(16).padStart(6, "0")}`;
@@ -40,6 +44,7 @@ interface Selection {
   shapeId: string;
   element?: ElementKey;
   size?: SizeKey;
+  cycles?: CycleKey;
 }
 
 /** stored string -> control state. Never parses: it's an index lookup, so a
@@ -49,7 +54,9 @@ function decompose(value: string): Selection {
   if (!value) return { shapeId: NONE_ID };
   if (SHEET_NAMES.includes(value)) return { shapeId: `${SHEET_PREFIX}${value}` };
   const axes = VFX_INDEX[value];
-  if (axes) return { shapeId: axes.shapeId, element: axes.element, size: axes.size };
+  if (axes) {
+    return { shapeId: axes.shapeId, element: axes.element, size: axes.size, cycles: axes.cycles };
+  }
   return { shapeId: CUSTOM_ID };
 }
 
@@ -67,6 +74,7 @@ export function VfxField({
    *  trigger a render. Written in `emit` (a handler), never during render. */
   const lastElement = useRef<ElementKey>("neutral");
   const lastSize = useRef<SizeKey>("base");
+  const lastCycles = useRef<CycleKey>(1);
 
   const sel = decompose(value);
   const shape = SHAPE_BY_ID.get(sel.shapeId);
@@ -74,26 +82,40 @@ export function VfxField({
   const isSheet = sel.shapeId.startsWith(SHEET_PREFIX);
   const hasElement = shape?.hasElement ?? false;
   const hasSize = shape?.hasSize ?? false;
+  const hasCycles = shape?.hasCycles ?? false;
 
-  const emit = (shapeId: string, element: ElementKey, size: SizeKey) => {
+  const emit = (
+    shapeId: string,
+    element: ElementKey,
+    size: SizeKey,
+    cycles: CycleKey,
+  ) => {
     lastElement.current = element;
     lastSize.current = size;
+    lastCycles.current = cycles;
     if (shapeId === NONE_ID) return onChange("");
     if (shapeId.startsWith(SHEET_PREFIX)) {
       return onChange(shapeId.slice(SHEET_PREFIX.length));
     }
-    const next = composeVfxName(shapeId, element, size);
+    const next = composeVfxName(shapeId, element, size, cycles);
     if (next) onChange(next);
   };
 
   const pickShape = (id: string) => {
     if (id === CUSTOM_ID) return; // display-only pinned entry
-    emit(id, sel.element ?? lastElement.current, sel.size ?? lastSize.current);
+    emit(
+      id,
+      sel.element ?? lastElement.current,
+      sel.size ?? lastSize.current,
+      sel.cycles ?? lastCycles.current,
+    );
   };
   const pickElement = (el: ElementKey) =>
-    emit(sel.shapeId, el, sel.size ?? lastSize.current);
+    emit(sel.shapeId, el, sel.size ?? lastSize.current, sel.cycles ?? lastCycles.current);
   const pickSize = (sz: SizeKey) =>
-    emit(sel.shapeId, sel.element ?? lastElement.current, sz);
+    emit(sel.shapeId, sel.element ?? lastElement.current, sz, sel.cycles ?? lastCycles.current);
+  const pickCycles = (cy: CycleKey) =>
+    emit(sel.shapeId, sel.element ?? lastElement.current, sel.size ?? lastSize.current, cy);
 
   if (raw) {
     return (
@@ -182,21 +204,40 @@ export function VfxField({
         </div>
 
         <div className="flex items-center gap-0.5">
-          {SIZE_ORDER.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              disabled={!hasSize}
-              onClick={() => pickSize(key)}
-              className={`w-7 rounded border px-1 py-0.5 text-xs transition disabled:opacity-25 ${
-                sel.size === key
-                  ? "border-slate-400 bg-slate-700 text-slate-100"
-                  : "border-slate-700 text-slate-400 hover:border-slate-500"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          {/* No shape has both Size and Cycles: render whichever axis this
+           *  shape actually has, and fall back to the greyed Size control
+           *  (today's "no such axis" affordance) when it has neither. */}
+          {hasCycles
+            ? CYCLE_ORDER.map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={!hasCycles}
+                  onClick={() => pickCycles(key)}
+                  className={`w-7 rounded border px-1 py-0.5 text-xs transition disabled:opacity-25 ${
+                    sel.cycles === key
+                      ? "border-slate-400 bg-slate-700 text-slate-100"
+                      : "border-slate-700 text-slate-400 hover:border-slate-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))
+            : SIZE_ORDER.map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={!hasSize}
+                  onClick={() => pickSize(key)}
+                  className={`w-7 rounded border px-1 py-0.5 text-xs transition disabled:opacity-25 ${
+                    sel.size === key
+                      ? "border-slate-400 bg-slate-700 text-slate-100"
+                      : "border-slate-700 text-slate-400 hover:border-slate-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
         </div>
       </div>
 
