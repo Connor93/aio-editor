@@ -66,25 +66,66 @@ const COMBOS: ReadonlyArray<readonly [ShapeKind, ShapeKind]> = [
 
 type SetPieceName = 'bolt' | 'smite' | 'rockfall' | 'ring-of-fire';
 
+export type CycleKey = 1 | 2 | 3;
+
+/** [name suffix, loop count]. Bare (1 cycle) carries NO suffix, mirroring how
+ *  base size does — so every existing set-piece name keeps working unchanged. */
+const CYCLES: ReadonlyArray<readonly [suffix: string, loops: CycleKey]> = [
+  ['', 1],
+  ['x2', 2],
+  ['x3', 3],
+];
+
 interface SetPieceConfig {
   frame: FrameGeometry;
   frames: number;
   loops: number;
   frameMs: number;
+  /** Descents only. `ring-of-fire` is inherently sustained — a one-cycle ring
+   *  of fire is not a thing anyone wants — so it keeps its fixed `loops` and
+   *  offers no axis, exactly as combos offer no size. */
+  hasCycles: boolean;
 }
 
-/** Element-parameterised, size-less. Descents are FAST (400ms) on purpose:
- *  skills have no cast time, so damage and impact_vfx resolve together and a
- *  slow descent would land its impact after the damage number had already
- *  popped. `ring-of-fire` is a sustained ground effect, so it keeps the
- *  square DIMENSIONS and loops — but uses GROUND_FRAME, not SQUARE_FRAME, so
- *  it burns on the floor instead of inheriting the body-blob lift (see
+/** Element-parameterised, size-less. Descents are FAST (400ms per cycle) on
+ *  purpose: skills have no cast time, so damage and impact_vfx resolve
+ *  together and a slow descent would land its impact after the damage
+ *  number had already popped — capping a single cycle at 4 * 100ms keeps the
+ *  FIRST cycle's landing frame in sync no matter how many cycles the
+ *  `cycles` axis repeats it for (see composeVfxName's `-x2`/`-x3` suffixes).
+ *  `ring-of-fire` is a sustained ground effect, so it keeps the square
+ *  DIMENSIONS and loops — but uses GROUND_FRAME, not SQUARE_FRAME, so it
+ *  burns on the floor instead of inheriting the body-blob lift (see
  *  GROUND_FRAME's doc comment in types.ts). */
 const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
-  bolt: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
-  smite: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
-  rockfall: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
-  'ring-of-fire': { frame: GROUND_FRAME, frames: 4, loops: 3, frameMs: 100 },
+  bolt: {
+    frame: TALL_FRAME,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
+    hasCycles: true,
+  },
+  smite: {
+    frame: TALL_FRAME,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
+    hasCycles: true,
+  },
+  rockfall: {
+    frame: TALL_FRAME,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
+    hasCycles: true,
+  },
+  'ring-of-fire': {
+    frame: GROUND_FRAME,
+    frames: 4,
+    loops: 3,
+    frameMs: 100,
+    hasCycles: false,
+  },
 };
 
 // Keys mirror SPECIALS below. A literal union (not `Record<string, Ramp>`)
@@ -275,22 +316,29 @@ export function buildRegistry(): Record<string, VfxDef> {
     registry[name] = def;
   }
 
-  // Set pieces: each x every element, base size only.
+  // Set pieces: each x every element, base size only. Descents (`hasCycles`)
+  // additionally fan out over CYCLES; ring-of-fire emits its one fixed-loop
+  // name, exactly as a combo emits its one base-size name.
   for (const [name, cfg] of Object.entries(SET_PIECES) as [
     SetPieceName,
     SetPieceConfig,
   ][]) {
     for (const element of Object.keys(ELEMENTS) as ElementKey[]) {
-      registry[`${name}-${element}`] = {
-        kind: name,
-        ramp: ELEMENTS[element],
-        sizeScale: 1,
-        additive: true,
-        frames: cfg.frames,
-        loops: cfg.loops,
-        frameMs: cfg.frameMs,
-        frame: cfg.frame,
-      };
+      const variants: ReadonlyArray<readonly [string, number]> = cfg.hasCycles
+        ? CYCLES
+        : [['', cfg.loops]];
+      for (const [suffix, loops] of variants) {
+        registry[`${name}-${element}${suffix ? `-${suffix}` : ''}`] = {
+          kind: name,
+          ramp: ELEMENTS[element],
+          sizeScale: 1,
+          additive: true,
+          frames: cfg.frames,
+          loops,
+          frameMs: cfg.frameMs,
+          frame: cfg.frame,
+        };
+      }
     }
   }
 
@@ -310,6 +358,18 @@ const KIND_KEYS: ReadonlySet<string> = new Set(MATRIX_KINDS);
 const ELEMENT_KEYS: ReadonlySet<string> = new Set(Object.keys(ELEMENTS));
 const SPECIAL_KEYS: ReadonlySet<string> = new Set(Object.keys(SPECIALS));
 const SET_PIECE_KEYS: ReadonlySet<string> = new Set(Object.keys(SET_PIECES));
+// Which set pieces carry the cycles axis (descents), NOT `SET_PIECES[name]`
+// — see the "Record<string, T> is a cross-repo hazard" note atop this file:
+// indexing SET_PIECES with a plain `name: string` (as composeVfxName has,
+// having only proven membership via SET_PIECE_KEYS.has) widens to
+// `SetPieceConfig | undefined` under aio-editor's noUncheckedIndexedAccess. A
+// Set built from the already-typed `Object.entries(...) as [...][]` cast
+// (same pattern buildRegistry/buildIndex/buildShapes use) sidesteps it.
+const SET_PIECE_CYCLE_KEYS: ReadonlySet<string> = new Set(
+  (Object.entries(SET_PIECES) as [SetPieceName, SetPieceConfig][])
+    .filter(([, cfg]) => cfg.hasCycles)
+    .map(([name]) => name),
+);
 
 const KIND_PREFIX = 'kind:';
 const COMBO_PREFIX = 'combo:';
@@ -343,6 +403,7 @@ export interface VfxAxes {
   combo?: ShapeKind;
   element?: ElementKey;
   size?: SizeKey;
+  cycles?: CycleKey;
   shapeId: string;
 }
 
@@ -352,6 +413,7 @@ export interface VfxShape {
   layer: VfxLayer;
   hasElement: boolean;
   hasSize: boolean;
+  hasCycles: boolean;
 }
 
 /** name -> the axes that produced it, for every key in buildRegistry().
@@ -397,14 +459,23 @@ export function buildIndex(): Record<string, VfxAxes> {
     };
   }
 
-  for (const name of Object.keys(SET_PIECES) as SetPieceName[]) {
+  for (const [name, cfg] of Object.entries(SET_PIECES) as [
+    SetPieceName,
+    SetPieceConfig,
+  ][]) {
     for (const element of Object.keys(ELEMENTS) as ElementKey[]) {
-      index[`${name}-${element}`] = {
-        layer: 'setpiece',
-        kind: name,
-        element,
-        shapeId: setPieceShapeId(name),
-      };
+      const variants: ReadonlyArray<readonly [string, CycleKey]> = cfg.hasCycles
+        ? CYCLES
+        : [['', 1]];
+      for (const [suffix, cycles] of variants) {
+        index[`${name}-${element}${suffix ? `-${suffix}` : ''}`] = {
+          layer: 'setpiece',
+          kind: name,
+          element,
+          cycles: cfg.hasCycles ? cycles : undefined,
+          shapeId: setPieceShapeId(name),
+        };
+      }
     }
   }
 
@@ -423,6 +494,7 @@ export function buildShapes(): VfxShape[] {
       layer: 'matrix',
       hasElement: true,
       hasSize: true,
+      hasCycles: false,
     });
   }
 
@@ -435,6 +507,7 @@ export function buildShapes(): VfxShape[] {
       // Combos are generated at base size only — the registry has no
       // `nova-sparkle-fire-lg`, so the picker must not offer a size.
       hasSize: false,
+      hasCycles: false,
     });
   }
 
@@ -445,16 +518,21 @@ export function buildShapes(): VfxShape[] {
       layer: 'special',
       hasElement: false,
       hasSize: false,
+      hasCycles: false,
     });
   }
 
-  for (const name of Object.keys(SET_PIECES) as SetPieceName[]) {
+  for (const [name, cfg] of Object.entries(SET_PIECES) as [
+    SetPieceName,
+    SetPieceConfig,
+  ][]) {
     shapes.push({
       id: setPieceShapeId(name),
       label: titleCase(name),
       layer: 'setpiece',
       hasElement: true,
       hasSize: false,
+      hasCycles: cfg.hasCycles,
     });
   }
 
@@ -462,11 +540,13 @@ export function buildShapes(): VfxShape[] {
 }
 
 /** axes -> generated name, or null if that combination isn't generated.
- *  Never throws: `shapeId` and `element` may come from persisted UI state. */
+ *  Never throws: `shapeId`, `element`, `size` and `cycles` may come from
+ *  persisted UI state. */
 export function composeVfxName(
   shapeId: string,
   element?: ElementKey,
   size?: SizeKey,
+  cycles?: CycleKey,
 ): string | null {
   if (shapeId.startsWith(SPECIAL_PREFIX)) {
     const name = shapeId.slice(SPECIAL_PREFIX.length);
@@ -479,7 +559,15 @@ export function composeVfxName(
     if (!element || !ELEMENT_KEYS.has(element)) return null;
     // `size` is deliberately ignored — set pieces are size-less, exactly as
     // the combo branch below ignores it.
-    return `${name}-${element}`;
+    if (!SET_PIECE_CYCLE_KEYS.has(name)) {
+      // No cycles axis (ring-of-fire): `cycles` is ignored entirely, exactly
+      // as `size` is ignored for every set piece above.
+      return `${name}-${element}`;
+    }
+    const entry = CYCLES.find(([, loops]) => loops === (cycles ?? 1));
+    if (!entry) return null; // unknown cycle value: null, never a silent 1
+    const [suffix] = entry;
+    return `${name}-${element}${suffix ? `-${suffix}` : ''}`;
   }
 
   if (shapeId.startsWith(COMBO_PREFIX)) {
