@@ -741,6 +741,290 @@ function drawBurstLines(
   }
 }
 
+// ── Set pieces (Task 5 exemplars) ──────────────────────────────────────
+// `bolt` and `smite` are the first two set pieces authored with real art —
+// Task 4 only wired the plumbing (both threw `unimplemented`). Task 6 fills
+// in `rockfall` and `ring-of-fire`.
+//
+// Both use TALL_FRAME: draw-space box 128 wide x 256 tall, ground point
+// handed to draw functions as (cx, cy) = (64, 192) — see FrameGeometry /
+// TALL_FRAME in types.ts. Set pieces are element-only and size-less
+// (registry.ts's SET_PIECES loop always builds them with sizeScale 1), so
+// unlike every kind above, their geometry constants are NOT multiplied by
+// `def.sizeScale` — there is no sm/lg variant to stay proportional with.
+//
+// Extent budget for TALL_FRAME is ASYMMETRIC and NOT what the original task
+// spec said. The spec's "<=126px above cy" was derived from half the frame
+// height (256/2) rather than from where the ground point actually sits
+// (3/4 of the way down), which would waste a third of the headroom that is
+// the entire reason TALL_FRAME exists. Correct numbers, re-derived from
+// designH=256 and groundY=192:
+//   horizontal from cx:  +/-64 available -> budget <= 62  (same as SQUARE_FRAME)
+//   above cy (headroom):  192 available  -> budget <= 190
+//   below cy (past the target): 64 available -> budget <= 62
+// Verified with a throwaway instrumented context; see the Task 5 report for
+// the per-element, per-frame, per-layer table.
+
+// `bolt`: a forked lightning strike. `behind` paints the upper fork (the
+// jagged bolt descending from off-screen), `front` continues it down into
+// the ground plus a widening ground flash, `tint` is a brief hot flash over
+// the character on the two middle frames only. Jitter reuses `indexFrac` —
+// the same deterministic-scatter primitive drawChains uses for its zigzag,
+// not a new PRNG.
+const BOLT_UPPER_TOP = 120; // cy - this: where the upper fork starts
+const BOLT_UPPER_BOTTOM = 30; // cy - this: where the upper fork ends and
+// the lower fork picks up
+const BOLT_TRUNK_SEGMENTS = 6;
+const BOLT_LOWER_SEGMENTS = 3;
+// Max horizontal jitter magnitude for the trunk/branches. Comfortably inside
+// the 62px horizontal budget by itself; branches add at most ~24px on top
+// (see drawBoltBehind), still well clear.
+const BOLT_JITTER = 9;
+
+function drawBoltBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Frames 0-1 (progress < 0.5): bright, full height. Frames 2-3: thinner
+  // and fading — the strike has already landed (see drawBoltFront) and the
+  // upper fork is dissipating.
+  const late = progress >= 0.5;
+  const topY = cy - BOLT_UPPER_TOP;
+  const bottomY = cy - BOLT_UPPER_BOTTOM;
+
+  ctx.strokeStyle = base(def);
+  ctx.lineWidth = late ? 2 : 3.5;
+  ctx.globalAlpha = late ? 0.35 : 1;
+
+  // Main trunk: a jagged polyline from the top of the fork down to where
+  // the lower fork picks up. Same zigzag idiom as drawChains — per-segment
+  // jitter derived from the segment index via indexFrac, never Math.random.
+  ctx.beginPath();
+  ctx.moveTo(cx, topY);
+  for (let s = 1; s <= BOLT_TRUNK_SEGMENTS; s++) {
+    const t = s / BOLT_TRUNK_SEGMENTS;
+    const y = topY + (bottomY - topY) * t;
+    const jag = (indexFrac(s * 11 + 3) - 0.5) * 2 * BOLT_JITTER;
+    ctx.lineTo(cx + jag, y);
+  }
+  ctx.stroke();
+
+  // Two side branches forking off the upper trunk, diverging left/right —
+  // this is what makes it read as "forked" rather than a single zigzag.
+  for (let b = 0; b < 2; b++) {
+    const originT = 0.3 + b * 0.3;
+    const originY = topY + (bottomY - topY) * originT;
+    const dir = b === 0 ? -1 : 1;
+    const reach = 14 + indexFrac(b * 13 + 5) * 10;
+    ctx.beginPath();
+    ctx.moveTo(cx, originY);
+    ctx.lineTo(cx + dir * reach, originY + reach * 0.8);
+    ctx.stroke();
+  }
+}
+
+function drawBoltFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  const late = progress >= 0.5;
+  const topY = cy - BOLT_UPPER_BOTTOM; // continues where the upper fork left off
+  const bottomY = cy;
+
+  ctx.strokeStyle = base(def);
+  ctx.lineWidth = late ? 2 : 3.5;
+  ctx.globalAlpha = late ? 0.5 : 1;
+
+  // Lower fork: continues the trunk down into the ground point. Different
+  // index offsets from the upper fork's jag (s*7+40 vs s*11+3) so the two
+  // halves don't look like a mechanically repeated pattern.
+  ctx.beginPath();
+  ctx.moveTo(cx, topY);
+  for (let s = 1; s <= BOLT_LOWER_SEGMENTS; s++) {
+    const t = s / BOLT_LOWER_SEGMENTS;
+    const y = topY + (bottomY - topY) * t;
+    const jag = (indexFrac(s * 7 + 40) - 0.5) * 2 * BOLT_JITTER;
+    ctx.lineTo(cx + jag, y);
+  }
+  ctx.stroke();
+
+  // Ground flash: a squashed ellipse at the ground point. Absent on frame 0
+  // (progress 0.125 — the bolt hasn't landed yet), then widening across
+  // frames 1-3. Max rx (progress 0.875) is ~32.5, ry ~13 — both comfortably
+  // inside budget.
+  if (progress > 0.25) {
+    const rx = 10 + (progress - 0.25) * 36;
+    const ry = rx * 0.4;
+    ctx.globalAlpha = late ? 0.5 : 0.9;
+    ctx.fillStyle = rung(def, RAMP_BASE + 1);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawBoltTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Frames 1-2 only (progress in (0.25, 0.75)) — a brief hot-rung flash over
+  // the character as the strike lands. Frames 0 and 3 paint nothing at all
+  // (no draw call, not just alpha 0 — same convention as drawShockwaveTint).
+  // Reuses the GROUND_TINT_* geometry (already proven under budget: dx=18,
+  // dy=56) but at the ramp's hot rung rather than `base`, per the brief's
+  // "hot-rung flash" — drawGroundTintWash hardcodes `base`, so this is
+  // inlined rather than calling it.
+  if (progress <= 0.25 || progress >= 0.75) return;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = rung(def, RAMP_BASE + 1);
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    cy - GROUND_TINT_Y_OFFSET,
+    GROUND_TINT_RX,
+    GROUND_TINT_RY,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+}
+
+// `smite`: a descending pillar of light into a ground flash. `behind` is the
+// pillar's outer/rear half (a wide, soft tapering band), `front` is the
+// near/core half (narrower, brighter, same band shape) plus the ground
+// flash, `tint` is a sustained wash across frames 1-3 — the one set piece
+// where a lingering tint is correct, since the character is standing IN the
+// beam rather than merely near an impact.
+//
+// Both layers share the same animated band shape: a fixed top edge near the
+// top of the frame, and a bottom edge whose offset above `cy` is computed by
+// smiteBottomOffset. Frames 0-1 sweep the bottom edge down, striking the
+// ground exactly on frame 1 (offset 0); frames 2-3 pull it back up while
+// fading — closed-form linear pieces solved so the two SAMPLED progress
+// values in each phase (there is no continuous animation to reason about —
+// only 0.125/0.375/0.625/0.875 are ever evaluated) land on the intended
+// offsets: 90 -> 0 for frames 0-1, then 20 -> 60 for frames 2-3.
+const SMITE_TOP_Y_OFFSET = 186; // cy - this = the band's fixed top edge.
+// Stays inside the <=190 above-cy budget with 4px of slack.
+const SMITE_BEHIND_TOP_HALF_WIDTH = 5;
+const SMITE_BEHIND_BASE_HALF_WIDTH = 11;
+const SMITE_FRONT_TOP_HALF_WIDTH = 3;
+const SMITE_FRONT_BASE_HALF_WIDTH = 7;
+
+function smiteBottomOffset(progress: number): {
+  offset: number;
+  alpha: number;
+} {
+  if (progress < 0.5) {
+    // Frames 0-1: descend. offset(0.125) = 90, offset(0.375) = 0 — the beam
+    // reaches the ground exactly on frame 1.
+    return { offset: 135 - 360 * progress, alpha: 1 };
+  }
+  // Frames 2-3: retract upward from the ground while fading.
+  // offset(0.625) = 20, offset(0.875) = 60; alpha(0.625) = 0.825,
+  // alpha(0.875) = 0.475.
+  const t = 2 * progress - 1;
+  return { offset: 80 * t, alpha: 1 - t * 0.7 };
+}
+
+function drawSmiteBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  const { offset, alpha } = smiteBottomOffset(progress);
+  const topY = cy - SMITE_TOP_Y_OFFSET;
+  const bottomY = cy - offset;
+
+  // Rear half reads softer than the front core — same band shape, lower alpha.
+  ctx.globalAlpha = alpha * 0.6;
+  ctx.fillStyle = base(def);
+  ctx.beginPath();
+  ctx.moveTo(cx - SMITE_BEHIND_TOP_HALF_WIDTH, topY);
+  ctx.lineTo(cx + SMITE_BEHIND_TOP_HALF_WIDTH, topY);
+  ctx.lineTo(cx + SMITE_BEHIND_BASE_HALF_WIDTH, bottomY);
+  ctx.lineTo(cx - SMITE_BEHIND_BASE_HALF_WIDTH, bottomY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawSmiteFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  const { offset, alpha } = smiteBottomOffset(progress);
+  const topY = cy - SMITE_TOP_Y_OFFSET;
+  const bottomY = cy - offset;
+
+  // Near half: a brighter, narrower core down the middle of the same band.
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = rung(def, RAMP_BASE + 1);
+  ctx.beginPath();
+  ctx.moveTo(cx - SMITE_FRONT_TOP_HALF_WIDTH, topY);
+  ctx.lineTo(cx + SMITE_FRONT_TOP_HALF_WIDTH, topY);
+  ctx.lineTo(cx + SMITE_FRONT_BASE_HALF_WIDTH, bottomY);
+  ctx.lineTo(cx - SMITE_FRONT_BASE_HALF_WIDTH, bottomY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Ground flash: appears once the beam first reaches the ground (frame 1,
+  // progress 0.375) and lingers through frame 3, independent of the band's
+  // own retract-and-fade above. Max rx (progress 0.875) is ~27.5, ry ~11.
+  if (progress > 0.25) {
+    const rx = 10 + (progress - 0.25) * 28;
+    const ry = rx * 0.4;
+    ctx.globalAlpha = progress < 0.75 ? 0.9 : 0.5;
+    ctx.fillStyle = rung(def, RAMP_BASE + 1);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawSmiteTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Frames 1-3 (progress > 0.25) — a SUSTAINED wash, unlike bolt's brief
+  // 2-frame flash: the character is standing in the beam for the back
+  // three-quarters of the effect, not just catching a passing strike. Frame
+  // 0 (still descending, hasn't reached the character yet) paints nothing.
+  // `base` rung (not hot) — a lingering wash reads better at the mid
+  // brightness than a sustained hot-rung flash would.
+  if (progress <= 0.25) return;
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    cy - GROUND_TINT_Y_OFFSET,
+    GROUND_TINT_RX,
+    GROUND_TINT_RY,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+}
+
 // Impacts: short, punchy hits. A single 4-frame cycle, no repeat —
 // 4 * 1 * 100ms = 400ms. Looping an impact reads as sluggish (see the
 // module-level cadence note below), so these get the minimum loop count.
@@ -798,18 +1082,14 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
   // the check script only ever inspects `typeof`, never calls the function.
   bolt: {
     ...IMPACT_TIMING,
-    draw: {
-      front: () => {
-        throw new Error('unimplemented: bolt');
-      },
-    },
+    draw: { behind: drawBoltBehind, tint: drawBoltTint, front: drawBoltFront },
   },
   smite: {
     ...IMPACT_TIMING,
     draw: {
-      front: () => {
-        throw new Error('unimplemented: smite');
-      },
+      behind: drawSmiteBehind,
+      tint: drawSmiteTint,
+      front: drawSmiteFront,
     },
   },
   rockfall: {
