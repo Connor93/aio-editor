@@ -13,6 +13,13 @@
 // leak into a combo layer drawn right after). Every coordinate is instead
 // computed directly from `cx`/`cy` via cos/sin offsets.
 //
+// Sanctioned exception: `cleave` (below) saves/translates/rotates internally
+// to mirror and rotate its flurry cycles, and restores before returning —
+// verified not to leak into a combo layer. That is the only reason it exists;
+// do not copy the pattern into a new kind without the same save/restore
+// pairing, and do not "simplify" cleave back to the no-transform convention —
+// its mirrored X depends on it.
+//
 // Corollary of that shared-context convention: a draw function that sets a
 // ctx property to a NON-default value which other kinds don't set for
 // themselves must restore the canvas default before returning, or it leaks
@@ -1657,6 +1664,164 @@ function drawCleaveFront(
   }
 }
 
+// ---- swordfall ------------------------------------------------------------
+// Unlike cleave, the blade here IS literal: TALL_FRAME rasterises 44x88, and
+// the vertical room is enough for a readable silhouette. It descends
+// point-down, plants in the ground, and throws an impact ring.
+
+const SWORDFALL_BLADE_LEN = 84;
+const SWORDFALL_BLADE_HALF_W = 5;
+const SWORDFALL_GUARD_HALF_W = 15;
+const SWORDFALL_GUARD_H = 5;
+const SWORDFALL_GRIP_H = 20;
+const SWORDFALL_GRIP_HALF_W = 3;
+const SWORDFALL_POMMEL_R = 4;
+
+/** Planted height above the ground point: tip at cy, pommel top at
+ *  cy - SWORDFALL_TOTAL_HEIGHT. Asserted against TALL_FRAME.groundY in
+ *  scripts/vfx-registry-check.ts. */
+export const SWORDFALL_TOTAL_HEIGHT =
+  SWORDFALL_BLADE_LEN +
+  SWORDFALL_GUARD_H +
+  SWORDFALL_GRIP_H +
+  SWORDFALL_POMMEL_R * 2;
+
+/** How far above the ground the tip starts. Larger than the headroom on
+ *  purpose: on the first frame the hilt is above the frame edge and clips,
+ *  which reads as the sword entering from off-screen. Every LATER frame is
+ *  fully on-screen (see the extent assertion). */
+const SWORDFALL_START_ABOVE = 150;
+const SWORDFALL_LAND_PROGRESS = 0.5;
+
+/** Tip offset above the ground point, and whether the blade has planted. */
+function swordfallTip(progress: number): { above: number; planted: boolean } {
+  if (progress >= SWORDFALL_LAND_PROGRESS) return { above: 0, planted: true };
+  const fall = progress / SWORDFALL_LAND_PROGRESS;
+  // Accelerating fall — a linear descent reads as a lift, not a drop.
+  return { above: SWORDFALL_START_ABOVE * (1 - fall * fall), planted: false };
+}
+
+/** The sword itself, tip at (cx, cy - above), pointing down. */
+function swordfallBlade(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  above: number,
+  colour: string,
+  alpha: number,
+): void {
+  const tipY = cy - above;
+  const guardY = tipY - SWORDFALL_BLADE_LEN;
+
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = colour;
+
+  // Blade: a tapered quad from the point up to the guard.
+  ctx.beginPath();
+  ctx.moveTo(cx, tipY);
+  ctx.lineTo(cx + SWORDFALL_BLADE_HALF_W, guardY);
+  ctx.lineTo(cx - SWORDFALL_BLADE_HALF_W, guardY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Crossguard.
+  ctx.fillRect(
+    cx - SWORDFALL_GUARD_HALF_W,
+    guardY - SWORDFALL_GUARD_H,
+    SWORDFALL_GUARD_HALF_W * 2,
+    SWORDFALL_GUARD_H,
+  );
+
+  // Grip.
+  ctx.fillRect(
+    cx - SWORDFALL_GRIP_HALF_W,
+    guardY - SWORDFALL_GUARD_H - SWORDFALL_GRIP_H,
+    SWORDFALL_GRIP_HALF_W * 2,
+    SWORDFALL_GRIP_H,
+  );
+
+  // Pommel.
+  ctx.beginPath();
+  ctx.arc(
+    cx,
+    guardY - SWORDFALL_GUARD_H - SWORDFALL_GRIP_H - SWORDFALL_POMMEL_R,
+    SWORDFALL_POMMEL_R,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+
+  ctx.globalAlpha = 1;
+}
+
+function drawSwordfallBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  const { planted } = swordfallTip(progress);
+  if (!planted) return;
+
+  // Dust wedge kicked up behind the impact. An empty `behind` frame before
+  // the blade lands is CORRECT — there is nothing behind the character yet.
+  // Do not "fix" it by painting something on the descent frames; the same
+  // conclusion rockfall's third landing reached.
+  const age =
+    (progress - SWORDFALL_LAND_PROGRESS) / (1 - SWORDFALL_LAND_PROGRESS);
+  const spread = 14 + age * 22;
+  ctx.globalAlpha = 0.55 * (1 - age);
+  ctx.fillStyle = base(def);
+  ctx.beginPath();
+  ctx.moveTo(cx - spread, cy);
+  ctx.lineTo(cx + spread, cy);
+  ctx.lineTo(cx + spread * 0.4, cy - 20 - age * 14);
+  ctx.lineTo(cx - spread * 0.4, cy - 20 - age * 14);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawSwordfallTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Bloom along the blade. Composited `add` regardless of def.additive, so
+  // keep it faint — see SkillBurst's constructor comment.
+  const { above } = swordfallTip(progress);
+  swordfallBlade(ctx, cx, cy, above, rung(def, RAMP_BASE + 1), 0.35);
+}
+
+function drawSwordfallFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  const { above, planted } = swordfallTip(progress);
+  swordfallBlade(ctx, cx, cy, above, rung(def, RAMP_BASE + 1), 1);
+
+  if (!planted) return;
+
+  // Impact ring, expanding and fading from the moment of landing.
+  const age =
+    (progress - SWORDFALL_LAND_PROGRESS) / (1 - SWORDFALL_LAND_PROGRESS);
+  const rx = 12 + age * 26;
+  ctx.globalAlpha = 0.9 * (1 - age);
+  ctx.strokeStyle = rung(def, RAMP_BASE + 2);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, rx * 0.4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
+}
+
 // Impacts: short, punchy hits. A single 4-frame cycle, no repeat —
 // 4 * 1 * 100ms = 400ms. Looping an impact reads as sluggish (see the
 // module-level cadence note below), so these get the minimum loop count.
@@ -1742,6 +1907,14 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
       behind: drawCleaveBehind,
       tint: drawCleaveTint,
       front: drawCleaveFront,
+    },
+  },
+  swordfall: {
+    ...IMPACT_TIMING,
+    draw: {
+      behind: drawSwordfallBehind,
+      tint: drawSwordfallTint,
+      front: drawSwordfallFront,
     },
   },
 };

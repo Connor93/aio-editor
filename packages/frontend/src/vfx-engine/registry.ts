@@ -64,7 +64,13 @@ const COMBOS: ReadonlyArray<readonly [ShapeKind, ShapeKind]> = [
   ['orbit', 'sparkle'],
 ];
 
-type SetPieceName = 'bolt' | 'smite' | 'rockfall' | 'ring-of-fire' | 'cleave';
+type SetPieceName =
+  | 'bolt'
+  | 'smite'
+  | 'rockfall'
+  | 'ring-of-fire'
+  | 'cleave'
+  | 'swordfall';
 
 export type CycleKey = 1 | 2 | 3;
 
@@ -155,6 +161,17 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     frameMs: 100,
     hasCycles: true,
     cycleMode: 'frames',
+  },
+  // TALL_FRAME, the descent path smite and rockfall use: the frame carries its
+  // own ground point at y=192, so no body lift. cycleMode 'loop' — repeated
+  // sword strikes are identical by design, so the cheap repeat is correct.
+  swordfall: {
+    frame: TALL_FRAME,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
+    hasCycles: true,
+    cycleMode: 'loop',
   },
 };
 
