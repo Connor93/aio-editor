@@ -44,18 +44,31 @@
 import { RAMP_BASE } from './palette';
 import type { ShapeKind, VfxDef } from './types';
 
+export type DrawFn = (
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+) => void;
+
+// Three depth passes per kind (see DepthLayer in types.ts). `front` is the
+// only mandatory one — every kind painted a single decal layer before this
+// task, so `front` is that same body moved verbatim. `behind`/`tint` are
+// left undefined here; Task 5 fills two kinds in as exemplars, and a kind
+// with no content for a layer simply omits the key rather than supplying a
+// no-op function — render.ts's renderFrameCanvas uses that absence to skip
+// rasterising (and allocating a canvas for) an empty layer.
 export interface KindConfig {
   frames: number;
   loops: number;
   frameMs: number;
   additive: boolean;
-  draw(
-    ctx: CanvasRenderingContext2D,
-    progress: number,
-    def: VfxDef,
-    cx: number,
-    cy: number,
-  ): void;
+  draw: {
+    behind?: DrawFn;
+    tint?: DrawFn;
+    front: DrawFn;
+  };
 }
 
 /** A rung of the def's ramp as a CSS hex. Index is clamped, so `rung(def, 4)`
@@ -602,19 +615,19 @@ const FLOW_TIMING = {
 } as const;
 
 export const KINDS: Record<ShapeKind, KindConfig> = {
-  ring: { ...IMPACT_TIMING, draw: drawRing },
-  disc: { ...IMPACT_TIMING, draw: drawDisc },
-  'spark-burst': { ...IMPACT_TIMING, draw: drawSparkBurst },
-  slash: { ...IMPACT_TIMING, draw: drawSlash },
-  nova: { ...IMPACT_TIMING, draw: drawNova },
-  shockwave: { ...IMPACT_TIMING, draw: drawShockwave },
-  implode: { ...IMPACT_TIMING, draw: drawImplode },
-  'burst-lines': { ...IMPACT_TIMING, draw: drawBurstLines },
-  sparkle: { ...FLOW_TIMING, draw: drawSparkle },
-  spiral: { ...FLOW_TIMING, draw: drawSpiral },
-  vortex: { ...FLOW_TIMING, draw: drawVortex },
-  orbit: { ...FLOW_TIMING, draw: drawOrbit },
-  chains: { ...FLOW_TIMING, draw: drawChains },
-  rain: { ...FLOW_TIMING, draw: drawRain },
-  'beam-pop': { ...FLOW_TIMING, draw: drawBeamPop },
+  ring: { ...IMPACT_TIMING, draw: { front: drawRing } },
+  disc: { ...IMPACT_TIMING, draw: { front: drawDisc } },
+  'spark-burst': { ...IMPACT_TIMING, draw: { front: drawSparkBurst } },
+  slash: { ...IMPACT_TIMING, draw: { front: drawSlash } },
+  nova: { ...IMPACT_TIMING, draw: { front: drawNova } },
+  shockwave: { ...IMPACT_TIMING, draw: { front: drawShockwave } },
+  implode: { ...IMPACT_TIMING, draw: { front: drawImplode } },
+  'burst-lines': { ...IMPACT_TIMING, draw: { front: drawBurstLines } },
+  sparkle: { ...FLOW_TIMING, draw: { front: drawSparkle } },
+  spiral: { ...FLOW_TIMING, draw: { front: drawSpiral } },
+  vortex: { ...FLOW_TIMING, draw: { front: drawVortex } },
+  orbit: { ...FLOW_TIMING, draw: { front: drawOrbit } },
+  chains: { ...FLOW_TIMING, draw: { front: drawChains } },
+  rain: { ...FLOW_TIMING, draw: { front: drawRain } },
+  'beam-pop': { ...FLOW_TIMING, draw: { front: drawBeamPop } },
 };

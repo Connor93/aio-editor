@@ -21,6 +21,16 @@ export type ShapeKind =
   | 'orbit'
   | 'burst-lines';
 
+// The three depth passes an effect can paint into, relative to the
+// character sprite: 'behind' composites under them, 'tint' blends onto them
+// (e.g. a multiply/screen wash), 'front' composites over them — the usual
+// decal layer every effect had before this type existed. NOT the same axis
+// as `VfxLayer` in registry.ts ('matrix' | 'combo' | 'special'), which
+// classifies how a name was generated, not where it paints. Do not conflate
+// the two or rename either.
+export type DepthLayer = 'behind' | 'tint' | 'front';
+export const DEPTH_LAYERS: readonly DepthLayer[] = ['behind', 'tint', 'front'];
+
 export interface VfxDef {
   kind: ShapeKind;
   ramp: Ramp; // shadow/mid/base/hot — was: color: number

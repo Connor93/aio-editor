@@ -9,9 +9,16 @@
 // PIXEL_SCALE with smoothing off. Quantising after the upscale would resample
 // the hard bands back into gradients and defeat the point.
 
+import type { DrawFn } from './kinds';
 import { KINDS } from './kinds';
 import type { Ramp } from './palette';
-import { DESIGN_SIZE, FRAME_SIZE, INTERNAL_SIZE, type VfxDef } from './types';
+import {
+  DESIGN_SIZE,
+  type DepthLayer,
+  FRAME_SIZE,
+  INTERNAL_SIZE,
+  type VfxDef,
+} from './types';
 
 /** Total playback time: one cycle of `frames`, repeated `loops` times. */
 export function effectDurationMs(def: VfxDef): number {
@@ -68,12 +75,26 @@ function quantizeToRamp(
   ctx.putImageData(img, 0, 0);
 }
 
-/** Rasterises ONE frame of ONE cycle. `frameIndex` must be in
- *  `[0, def.frames)` — looping (`def.loops`) is a playback-side concern, not
- *  a rasterisation one: the caller reuses these same `def.frames` textures
- *  for every repeat of the cycle rather than this function producing
- *  `frames * loops` distinct images. */
-export function renderFrameCanvas(
+/** One rasterised frame per depth layer. `front` is always present — every
+ *  kind supplies it (see KindConfig in kinds.ts). `behind`/`tint` are
+ *  present only when the kind (or its combo) actually paints something
+ *  there; a layer with no content is omitted rather than returned as a
+ *  blank canvas, so a kind that doesn't use `behind`/`tint` costs nothing
+ *  extra to rasterise or upload to the GPU. */
+export interface LayerCanvases {
+  behind?: HTMLCanvasElement;
+  tint?: HTMLCanvasElement;
+  front: HTMLCanvasElement;
+}
+
+/** Rasterises ONE frame of ONE cycle for ONE depth layer, given the list of
+ *  draw functions that paint into it (the kind's own function plus, when a
+ *  combo is set, the combo kind's function for the same layer). Shared by
+ *  every layer of renderFrameCanvas below — this is the Task-2
+ *  raster→quantise→upscale pipeline, unchanged, just parameterised over
+ *  which function(s) run at step 1. */
+function rasterizeLayer(
+  fns: readonly DrawFn[],
   def: VfxDef,
   frameIndex: number,
 ): HTMLCanvasElement {
@@ -94,15 +115,8 @@ export function renderFrameCanvas(
   sctx.scale(k, k);
   sctx.globalCompositeOperation = def.additive ? 'lighter' : 'source-over';
   const progress = frameProgress(def, frameIndex);
-  KINDS[def.kind].draw(sctx, progress, def, DESIGN_SIZE / 2, DESIGN_SIZE / 2);
-  if (def.combo) {
-    KINDS[def.combo].draw(
-      sctx,
-      progress,
-      def,
-      DESIGN_SIZE / 2,
-      DESIGN_SIZE / 2,
-    );
+  for (const fn of fns) {
+    fn(sctx, progress, def, DESIGN_SIZE / 2, DESIGN_SIZE / 2);
   }
   sctx.restore();
 
@@ -133,6 +147,49 @@ export function renderFrameCanvas(
   return out;
 }
 
+/** Collects the kind's (and, if set, the combo's) draw function for a single
+ *  layer, dropping whichever of the two is absent. */
+function layerFns(def: VfxDef, layer: DepthLayer): DrawFn[] {
+  const fns: DrawFn[] = [];
+  const kindFn = KINDS[def.kind].draw[layer];
+  if (kindFn) fns.push(kindFn);
+  if (def.combo) {
+    const comboFn = KINDS[def.combo].draw[layer];
+    if (comboFn) fns.push(comboFn);
+  }
+  return fns;
+}
+
+/** Rasterises ONE frame of ONE cycle, across all three depth layers.
+ *  `frameIndex` must be in `[0, def.frames)` — looping (`def.loops`) is a
+ *  playback-side concern, not a rasterisation one: the caller reuses these
+ *  same `def.frames` textures for every repeat of the cycle rather than this
+ *  function producing `frames * loops` distinct images.
+ *
+ *  `front` is rasterised unconditionally (every kind supplies it).
+ *  `behind`/`tint` are rasterised — and a canvas allocated for them — only
+ *  when the kind (or its combo) actually paints something there. */
+export function renderFrameCanvas(
+  def: VfxDef,
+  frameIndex: number,
+): LayerCanvases {
+  const result: LayerCanvases = {
+    front: rasterizeLayer(layerFns(def, 'front'), def, frameIndex),
+  };
+
+  const behindFns = layerFns(def, 'behind');
+  if (behindFns.length > 0) {
+    result.behind = rasterizeLayer(behindFns, def, frameIndex);
+  }
+
+  const tintFns = layerFns(def, 'tint');
+  if (tintFns.length > 0) {
+    result.tint = rasterizeLayer(tintFns, def, frameIndex);
+  }
+
+  return result;
+}
+
 // Reused scratch canvas for drawEffectAt (below) — module-level, NOT
 // allocated per call. The editor drives this on a continuous rAF loop, so a
 // fresh canvas per frame would churn garbage on a hot path. Created lazily
@@ -161,13 +218,19 @@ function getScratch(): {
 }
 
 /**
- * Paint an effect directly onto an existing context at an arbitrary progress.
+ * Paint ONE depth layer of an effect directly onto an existing context at an
+ * arbitrary progress. Returns early (painting nothing, not even a clear) if
+ * neither the kind nor its combo has a draw function for `layer` — cheap for
+ * callers that composite all three DEPTH_LAYERS every frame without first
+ * checking which ones a given def actually uses.
  *
  * @vendored eoweb itself never calls this — it only ever rasterizes discrete
  * frames via renderFrameCanvas above. It exists for aio-editor's VfxPreview,
  * which animates the vendored copy of this engine continuously in a live
- * `<canvas>`. The `@vendored` tag is what stops `pnpm knip` reporting it as
- * an unused export (see knip.json).
+ * `<canvas>`, compositing `behind`/`tint`/`front` with three calls per frame
+ * (one per DEPTH_LAYERS entry) the same way eoweb's 3-sprite renderer does.
+ * The `@vendored` tag is what stops `pnpm knip` reporting it as an unused
+ * export (see knip.json).
  */
 export function drawEffectAt(
   ctx: CanvasRenderingContext2D,
@@ -175,7 +238,11 @@ export function drawEffectAt(
   progress: number,
   cx: number,
   cy: number,
+  layer: DepthLayer,
 ): void {
+  const fns = layerFns(def, layer);
+  if (fns.length === 0) return;
+
   // Clear this effect's working region so callers can reuse a persistent
   // context frame-to-frame without ghosting.
   ctx.clearRect(
@@ -196,9 +263,8 @@ export function drawEffectAt(
   sctx.scale(k, k);
   sctx.globalCompositeOperation = def.additive ? 'lighter' : 'source-over';
   const half = DESIGN_SIZE / 2;
-  KINDS[def.kind].draw(sctx, progress, def, half, half);
-  if (def.combo) {
-    KINDS[def.combo].draw(sctx, progress, def, half, half);
+  for (const fn of fns) {
+    fn(sctx, progress, def, half, half);
   }
   // Restores the transform (and composite op) to identity/default before the
   // NEXT call reuses this same context — without this, ctx.scale(k, k) would
