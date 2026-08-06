@@ -13,7 +13,7 @@ import {
   type VfxDef,
 } from "../../vfx-engine";
 
-/** `buildRegistry()` allocates all 407 defs on every call — build it once
+/** `buildRegistry()` allocates all 449 defs on every call — build it once
  *  at module scope (module singletons only re-evaluate on a hard reload)
  *  instead of inside the component, an effect, or the rAF loop. */
 const VFX_REGISTRY: Record<string, VfxDef> = buildRegistry();
@@ -118,8 +118,12 @@ function drawCharacterStandIn(
  *  Two independent axes, don't conflate them: WHERE each layer draws
  *  relative to the stand-in (occlusion order — behind/stand-in/tint/front,
  *  fixed by the call order below) vs. HOW each layer's pixels combine with
- *  what's already on `ctx` (blend mode — plain `drawImage` is `source-over`
- *  for `behind`/`front`, but `tint` needs `lighter`, see below). */
+ *  what's already on `ctx` (blend mode — `behind`/`front` follow the def's
+ *  own `additive` flag, exactly like eoweb's `SkillBurst` arms those two
+ *  layers with `resolved.additive ? 'add' : 'normal'`; `tint` ignores the
+ *  flag and is unconditionally `lighter`, mirroring `SkillBurst` pinning its
+ *  tint sprite to Pixi's `blendMode = 'add'` in the constructor regardless
+ *  of `additive` — see below). */
 function compositeFrame(
   ctx: CanvasRenderingContext2D,
   layerCanvas: HTMLCanvasElement,
@@ -148,9 +152,21 @@ function compositeFrame(
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, outW, outH);
 
+  // `behind` follows the def's own `additive` flag — NOT a hardcoded
+  // `source-over` — mirroring eoweb's `SkillBurst.reset`, which arms this
+  // layer's Pixi sprite with `resolved.additive ? 'add' : 'normal'` (see
+  // skill-burst.ts). Before this, `behind` always drew `source-over`
+  // regardless of the flag; every def shipped so far happens to have
+  // `additive: true`, so the bug was invisible until this branch's
+  // ring-of-fire centre fill — the first large, 100%-coverage, full-alpha
+  // `behind` region — turned it into a solid opaque ellipse here while the
+  // game rendered it as a ground glow. Restored to `source-over`
+  // immediately after so it can't leak into the stand-in drawn next.
   layerCtx.clearRect(0, 0, outW, outH);
   drawEffectAt(layerCtx, def, progress, groundX, groundY, "behind");
+  ctx.globalCompositeOperation = def.additive ? "lighter" : "source-over";
   ctx.drawImage(layerCanvas, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
 
   // Stand-in goes BEFORE tint (occlusion order — a separate axis from the
   // tint's blend mode below, not the same concern): drawing it AFTER tint
@@ -163,26 +179,37 @@ function compositeFrame(
   // the game.
   drawCharacterStandIn(ctx, def.frame);
 
-  // `tint` is composited with `lighter` (Canvas2D's additive mode), NOT the
-  // `source-over` every other layer here uses — load-bearing, not cosmetic.
-  // The quantiser (vfx-engine/render.ts's quantizeToRamp) writes every
-  // painted pixel at FULL alpha, so a `source-over` draw would REPLACE the
-  // stand-in's pixels under the tint with an opaque, flat-coloured patch.
-  // eoweb's SkillBurst pins the exact same layer to Pixi's `blendMode =
-  // 'add'` for the exact same reason (see skill-burst.ts) — `lighter` is
-  // Canvas2D's equivalent, and the two are visually identical for a fully-
-  // opaque source, which every quantised pixel is. Mismatching this is what
-  // makes the editor preview lie about "glow vs ugly blob," the one call
-  // this whole rework flagged as visually risky for a human to judge.
+  // `tint` is composited with `lighter` (Canvas2D's additive mode)
+  // UNCONDITIONALLY — unlike `behind`/`front`, which follow the def's own
+  // `additive` flag (see above/below), `tint` ignores it and is always
+  // additive. Load-bearing, not cosmetic: the quantiser
+  // (vfx-engine/render.ts's quantizeToRamp) writes every painted pixel at
+  // FULL alpha, so a `source-over` draw would REPLACE the stand-in's pixels
+  // under the tint with an opaque, flat-coloured patch. eoweb's SkillBurst
+  // pins the exact same layer to Pixi's `blendMode = 'add'` in its
+  // constructor for the exact same reason, regardless of
+  // `resolved.additive` (see skill-burst.ts) — `lighter` is Canvas2D's
+  // equivalent, and the two are visually identical for a fully-opaque
+  // source, which every quantised pixel is. Mismatching this is what makes
+  // the editor preview lie about "glow vs ugly blob," the one call this
+  // whole rework flagged as visually risky for a human to judge.
   layerCtx.clearRect(0, 0, outW, outH);
   drawEffectAt(layerCtx, def, progress, groundX, groundY, "tint");
   ctx.globalCompositeOperation = "lighter";
   ctx.drawImage(layerCanvas, 0, 0);
   ctx.globalCompositeOperation = "source-over";
 
+  // `front` follows the def's own `additive` flag too, same as `behind`
+  // above and for the same reason — mirrors eoweb's `SkillBurst.reset`
+  // arming this layer with the same `resolved.additive ? 'add' : 'normal'`
+  // blend mode. Restored to `source-over` immediately after so it can't
+  // leak into the NEXT frame's `behind` composite (this function is called
+  // once per rendered frame, reusing the same persistent `ctx`).
   layerCtx.clearRect(0, 0, outW, outH);
   drawEffectAt(layerCtx, def, progress, groundX, groundY, "front");
+  ctx.globalCompositeOperation = def.additive ? "lighter" : "source-over";
   ctx.drawImage(layerCanvas, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
 }
 
 /** Live preview of a `cast_vfx`/`impact_vfx` name.

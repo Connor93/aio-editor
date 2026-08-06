@@ -1405,10 +1405,15 @@ function drawRingOfFireTongues(
   }
 }
 
-// Interior wash: a quantised fill covering most of the ring's footprint, a
-// rung duller than the tongues (the "base" rung rather than "hot" —
-// see palette.ts's Ramp doc comment for the shadow/mid/base/hot order) and
-// flickering off the SAME clock as the tongues (ringOfFireFlicker) but at a
+// Interior wash: a quantised fill covering most of the ring's footprint,
+// AUTHORED at the "base" rung (see `base(def)` below, and palette.ts's Ramp
+// doc comment for the shadow/mid/base/hot order) but at alpha 0.45-0.75 the
+// quantiser (quantizeToRamp) resolves it one or two rungs DULLER than
+// authored, and which rung it lands on varies per element — measured:
+// `neutral` swings base<->mid, `fire`/`water`/`earth` swing mid<->shadow,
+// `wind`/`light` sit steady on mid, `dark` sits steady on shadow. Don't
+// assume "authored at X" means "renders at X" here; it doesn't. It flickers
+// off the SAME clock as the tongues (ringOfFireFlicker) but at a
 // visibly smaller amplitude (0.15 vs the band's 0.3) — a gentler pulse
 // under the flame licks, not a second set of flames. `behind` ONLY (see the
 // big comment above this section): painting this from drawRingOfFireFront
@@ -1452,9 +1457,12 @@ function drawRingOfFireBehind(
 ): void {
   // Ground glow first — painter's-algorithm base layer. Paint order is
   // harmless under the 'lighter'/additive composite ring-of-fire uses (see
-  // FLOW_TIMING's `additive: true` below): summing is commutative, so this
-  // could legally go last too. It's placed first because it's logically the
-  // "ground" the band and tongues sit on top of.
+  // registry.ts's set-piece build loop, which hardcodes `additive: true`
+  // for every set-piece def — NOT this file's FLOW_TIMING below, whose own
+  // `additive` field is never read for set-piece kinds; see the module note
+  // above KINDS for why): summing is commutative, so this could legally go
+  // last too. It's placed first because it's logically the "ground" the
+  // band and tongues sit on top of.
   drawRingOfFireCentreFill(ctx, progress, def, cx, cy);
 
   // Far arc — same half-split as drawRingBehind/drawShockwaveBehind above,

@@ -464,6 +464,13 @@ export function buildIndex(): Record<string, VfxAxes> {
     SetPieceConfig,
   ][]) {
     for (const element of Object.keys(ELEMENTS) as ElementKey[]) {
+      // The `1` in the no-cycles fallback tuple is a dead payload, not a
+      // real cycle count: it exists only to satisfy the `CycleKey` slot of
+      // the tuple type below (`variants` must be homogeneous with `CYCLES`,
+      // whose tuples carry a real loop count), and is immediately discarded
+      // by `cfg.hasCycles ? cycles : undefined` on the next line — this
+      // branch only runs when `cfg.hasCycles` is false. Any valid `CycleKey`
+      // value would do here.
       const variants: ReadonlyArray<readonly [string, CycleKey]> = cfg.hasCycles
         ? CYCLES
         : [['', 1]];

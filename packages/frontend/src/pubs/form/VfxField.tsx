@@ -212,7 +212,6 @@ export function VfxField({
                 <button
                   key={key}
                   type="button"
-                  disabled={!hasCycles}
                   onClick={() => pickCycles(key)}
                   className={`w-7 rounded border px-1 py-0.5 text-xs transition disabled:opacity-25 ${
                     sel.cycles === key
