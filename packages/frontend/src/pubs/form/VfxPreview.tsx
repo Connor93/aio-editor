@@ -95,9 +95,14 @@ function drawCharacterStandIn(ctx: CanvasRenderingContext2D): void {
  *  context frame-to-frame without ghosting — but that means three direct
  *  calls onto the SAME `ctx` would each wipe out the layer(s) drawn just
  *  before it, leaving only `front` visible. Routing each layer through its
- *  own scratch tile first and compositing that onto `ctx` with a plain
- *  `drawImage` (source-over, alpha-respecting, no clear) is what actually
- *  lets `behind`/the stand-in/`tint` survive underneath what's drawn next. */
+ *  own scratch tile first and compositing that onto `ctx` is what actually
+ *  lets `behind`/the stand-in/`tint` survive underneath what's drawn next.
+ *
+ *  Two independent axes, don't conflate them: WHERE each layer draws
+ *  relative to the stand-in (occlusion order — behind/stand-in/tint/front,
+ *  fixed by the call order below) vs. HOW each layer's pixels combine with
+ *  what's already on `ctx` (blend mode — plain `drawImage` is `source-over`
+ *  for `behind`/`front`, but `tint` needs `lighter`, see below). */
 function compositeFrame(
   ctx: CanvasRenderingContext2D,
   layerCanvas: HTMLCanvasElement,
@@ -121,15 +126,33 @@ function compositeFrame(
   drawEffectAt(layerCtx, def, progress, half, half, "behind");
   ctx.drawImage(layerCanvas, 0, 0);
 
-  // Stand-in goes BEFORE tint (not after) so a tint with content visibly
-  // flashes over/occludes it — drawing it after tint would hide the exact
-  // thing Task 7's brief calls out: the tint layer resolves to a hard-edged
-  // quantised colour patch, not a soft glow, and that has to stay visible.
+  // Stand-in goes BEFORE tint (occlusion order — a separate axis from the
+  // tint's blend mode below, not the same concern): drawing it AFTER tint
+  // would put the stand-in's own opaque pixels on top of the tint instead of
+  // under it, hiding the exact thing this whole rework flagged as visually
+  // risky — whether the tint reads as a glow on the character or an ugly
+  // blob. The tint's blend mode (below) controls how its pixels combine
+  // with what's already there; this ordering controls what's underneath it
+  // in the first place. Both have to be right for the preview to predict
+  // the game.
   drawCharacterStandIn(ctx);
 
+  // `tint` is composited with `lighter` (Canvas2D's additive mode), NOT the
+  // `source-over` every other layer here uses — load-bearing, not cosmetic.
+  // The quantiser (vfx-engine/render.ts's quantizeToRamp) writes every
+  // painted pixel at FULL alpha, so a `source-over` draw would REPLACE the
+  // stand-in's pixels under the tint with an opaque, flat-coloured patch.
+  // eoweb's SkillBurst pins the exact same layer to Pixi's `blendMode =
+  // 'add'` for the exact same reason (see skill-burst.ts) — `lighter` is
+  // Canvas2D's equivalent, and the two are visually identical for a fully-
+  // opaque source, which every quantised pixel is. Mismatching this is what
+  // makes the editor preview lie about "glow vs ugly blob," the one call
+  // this whole rework flagged as visually risky for a human to judge.
   layerCtx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
   drawEffectAt(layerCtx, def, progress, half, half, "tint");
+  ctx.globalCompositeOperation = "lighter";
   ctx.drawImage(layerCanvas, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
 
   layerCtx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
   drawEffectAt(layerCtx, def, progress, half, half, "front");
