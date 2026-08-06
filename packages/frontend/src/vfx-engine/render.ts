@@ -2,23 +2,21 @@
 // Canvas2D dispatchers: rasterize a single frame to an offscreen canvas, or
 // paint an effect directly onto an existing context at a given progress.
 //
-// Both paths share the same pixel pipeline: raster small (INTERNAL_SIZE) in
-// the draw functions' native DESIGN_SIZE coordinate space, quantise every
-// painted pixel onto the def's 4-rung ramp WHILE STILL at raster resolution
-// (so the ramp bands land on whole pixels), then upscale by the integer
-// PIXEL_SCALE with smoothing off. Quantising after the upscale would resample
-// the hard bands back into gradients and defeat the point.
+// Both paths share the same pixel pipeline: raster small (def.frame's
+// internalW x internalH) in the draw functions' native DESIGN_SIZE-wide
+// coordinate space, quantise every painted pixel onto the def's 4-rung ramp
+// WHILE STILL at raster resolution (so the ramp bands land on whole pixels),
+// then upscale by the integer PIXEL_SCALE — per axis — with smoothing off.
+// Quantising after the upscale would resample the hard bands back into
+// gradients and defeat the point. See FrameGeometry in types.ts for how a
+// def's frame (SQUARE_FRAME for every effect that existed before set pieces,
+// TALL_FRAME for descents) derives internalW/internalH/outW/outH from a
+// draw-space box.
 
 import type { DrawFn } from './kinds';
 import { KINDS } from './kinds';
 import type { Ramp } from './palette';
-import {
-  DESIGN_SIZE,
-  type DepthLayer,
-  FRAME_SIZE,
-  INTERNAL_SIZE,
-  type VfxDef,
-} from './types';
+import type { DepthLayer, VfxDef } from './types';
 
 /** Total playback time: one cycle of `frames`, repeated `loops` times. */
 export function effectDurationMs(def: VfxDef): number {
@@ -41,14 +39,17 @@ export function frameProgress(def: VfxDef, frameIndex: number): number {
  *  Hard steps, no dither: a screen-space dither pattern shimmers when the shape
  *  animates through it (explicitly rejected during design).
  *
- *  Runs on the INTERNAL_SIZE buffer, BEFORE upscaling, so the ramp bands are
- *  whole pixels rather than being resampled into gradients. */
+ *  Runs on the frame's internal raster buffer, BEFORE upscaling, so the ramp
+ *  bands are whole pixels rather than being resampled into gradients. Width
+ *  and height are taken separately (not one square `size`) now that a def's
+ *  internal raster can be taller than it is wide (see FrameGeometry). */
 function quantizeToRamp(
   ctx: CanvasRenderingContext2D,
-  size: number,
+  width: number,
+  height: number,
   ramp: Ramp,
 ): void {
-  const img = ctx.getImageData(0, 0, size, size);
+  const img = ctx.getImageData(0, 0, width, height);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
     const a = d[i + 3] as number;
@@ -92,58 +93,60 @@ export interface LayerCanvases {
  *  combo is set, the combo kind's function for the same layer). Shared by
  *  every layer of renderFrameCanvas below — this is the Task-2
  *  raster→quantise→upscale pipeline, unchanged, just parameterised over
- *  which function(s) run at step 1. */
+ *  the def's own frame geometry (`def.frame`) instead of the old global
+ *  square constants. Every def registered before this task carries
+ *  SQUARE_FRAME, whose numbers ARE those old globals, so this produces
+ *  byte-identical output for all of them. */
 function rasterizeLayer(
   fns: readonly DrawFn[],
   def: VfxDef,
   frameIndex: number,
 ): HTMLCanvasElement {
-  // 1. Rasterise at INTERNAL_SIZE. Draw functions keep writing in the 128px
-  //    DESIGN_SIZE space and ctx.scale does the reduction — their geometry
-  //    constants are tuned to that space (Chebyshev extent <= 62px at
-  //    sizeScale 1.5) and must NOT be rewritten.
+  const f = def.frame;
+
+  // 1. Rasterise at the frame's internal resolution. Draw functions keep
+  //    writing in the DESIGN_SIZE-wide space and ctx.scale does the
+  //    reduction — their geometry constants are tuned to that space
+  //    (Chebyshev extent <= 62px at sizeScale 1.5) and must NOT be rewritten.
   const small = document.createElement('canvas');
-  small.width = INTERNAL_SIZE;
-  small.height = INTERNAL_SIZE;
+  small.width = f.internalW;
+  small.height = f.internalH;
   const sctx = small.getContext('2d', { willReadFrequently: true });
   if (!sctx) {
     throw new Error('vfx-engine: failed to acquire a 2d canvas context');
   }
 
-  const k = INTERNAL_SIZE / DESIGN_SIZE;
+  // Width-derived; both axes share it (internalH is designH scaled by the
+  // very same factor — see makeFrame in types.ts), so a single ctx.scale(k,
+  // k) is correct even for a non-square frame.
+  const k = f.internalW / f.designW;
   sctx.save();
   sctx.scale(k, k);
   sctx.globalCompositeOperation = def.additive ? 'lighter' : 'source-over';
   const progress = frameProgress(def, frameIndex);
   for (const fn of fns) {
-    fn(sctx, progress, def, DESIGN_SIZE / 2, DESIGN_SIZE / 2);
+    // GROUND POINT, not the frame centre. For SQUARE_FRAME this is (64, 64)
+    // — byte-identical to what every existing kind received before this
+    // change (DESIGN_SIZE/2, DESIGN_SIZE/2).
+    fn(sctx, progress, def, f.designW / 2, f.groundY);
   }
   sctx.restore();
 
   // 2. Quantise onto the ramp while still at raster resolution.
-  quantizeToRamp(sctx, INTERNAL_SIZE, def.ramp);
+  quantizeToRamp(sctx, f.internalW, f.internalH, def.ramp);
 
-  // 3. Upscale by an INTEGER factor with smoothing off. A fractional ratio
-  //    produces pixels of uneven size, which reads as a rendering fault.
+  // 3. Upscale by an INTEGER factor, per axis, with smoothing off. A
+  //    fractional ratio on either axis produces pixels of uneven size,
+  //    which reads as a rendering fault.
   const out = document.createElement('canvas');
-  out.width = FRAME_SIZE;
-  out.height = FRAME_SIZE;
+  out.width = f.outW;
+  out.height = f.outH;
   const octx = out.getContext('2d');
   if (!octx) {
     throw new Error('vfx-engine: failed to acquire a 2d canvas context');
   }
   octx.imageSmoothingEnabled = false;
-  octx.drawImage(
-    small,
-    0,
-    0,
-    INTERNAL_SIZE,
-    INTERNAL_SIZE,
-    0,
-    0,
-    FRAME_SIZE,
-    FRAME_SIZE,
-  );
+  octx.drawImage(small, 0, 0, f.internalW, f.internalH, 0, 0, f.outW, f.outH);
   return out;
 }
 
@@ -197,22 +200,43 @@ export function renderFrameCanvas(
 // this module in a headless context (e.g. `pnpm vfx:check`, which imports the
 // whole `@/vfx-engine` barrel but never calls draw()/renderFrameCanvas()/
 // drawEffectAt()) never touches `document`.
+//
+// Resized only when a call's frame dimensions differ from the LAST call's
+// (scratchW/scratchH track what's currently allocated) — most callers hammer
+// this with the same def (and therefore the same frame) every rAF tick, so
+// reallocating on every call would defeat the whole point of reuse. A caller
+// that alternates between two differently-sized frames (e.g. SQUARE_FRAME
+// and TALL_FRAME back to back) will thrash this cache, but correctness never
+// depends on the previous call's size — sctx.clearRect always covers exactly
+// the current call's f.internalW x f.internalH before anything is drawn.
 let scratch: HTMLCanvasElement | null = null;
 let scratchCtx: CanvasRenderingContext2D | null = null;
-function getScratch(): {
+let scratchW = 0;
+let scratchH = 0;
+function getScratch(
+  internalW: number,
+  internalH: number,
+): {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
 } {
-  if (!scratch || !scratchCtx) {
-    const canvas = document.createElement('canvas');
-    canvas.width = INTERNAL_SIZE;
-    canvas.height = INTERNAL_SIZE;
+  if (
+    !scratch ||
+    !scratchCtx ||
+    scratchW !== internalW ||
+    scratchH !== internalH
+  ) {
+    const canvas = scratch ?? document.createElement('canvas');
+    canvas.width = internalW;
+    canvas.height = internalH;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) {
       throw new Error('vfx-engine: failed to acquire a 2d canvas context');
     }
     scratch = canvas;
     scratchCtx = ctx;
+    scratchW = internalW;
+    scratchH = internalH;
   }
   return { canvas: scratch, ctx: scratchCtx };
 }
@@ -223,6 +247,12 @@ function getScratch(): {
  * neither the kind nor its combo has a draw function for `layer` — cheap for
  * callers that composite all three DEPTH_LAYERS every frame without first
  * checking which ones a given def actually uses.
+ *
+ * `(cx, cy)` is the def's GROUND POINT (the target's feet), not the frame
+ * centre — for a def whose frame has `anchorY !== 0.5` (e.g. TALL_FRAME) the
+ * painted box extends further above `cy` than below it. The destination
+ * rect's top-left is therefore `(cx - f.outW / 2, cy - f.outH * f.anchorY)`;
+ * for SQUARE_FRAME (anchorY 0.5) that reduces to the old `cy - f.outH / 2`.
  *
  * @vendored eoweb itself never calls this — it only ever rasterizes discrete
  * frames via renderFrameCanvas above. It exists for aio-editor's VfxPreview,
@@ -245,28 +275,28 @@ export function drawEffectAt(
   const fns = layerFns(def, layer);
   if (fns.length === 0) return;
 
+  const f = def.frame;
+  const destX = cx - f.outW / 2;
+  const destY = cy - f.outH * f.anchorY;
+
   // Clear this effect's working region so callers can reuse a persistent
   // context frame-to-frame without ghosting.
-  ctx.clearRect(
-    cx - FRAME_SIZE / 2,
-    cy - FRAME_SIZE / 2,
-    FRAME_SIZE,
-    FRAME_SIZE,
-  );
+  ctx.clearRect(destX, destY, f.outW, f.outH);
 
-  // 1. Rasterise at INTERNAL_SIZE on the reused scratch canvas. Cleared
-  //    first — unlike renderFrameCanvas's fresh-per-call canvas, this one
-  //    carries the previous call's pixels into the next.
-  const { canvas: small, ctx: sctx } = getScratch();
-  sctx.clearRect(0, 0, INTERNAL_SIZE, INTERNAL_SIZE);
+  // 1. Rasterise at the frame's internal resolution on the reused scratch
+  //    canvas. Cleared first — unlike renderFrameCanvas's fresh-per-call
+  //    canvas, this one carries the previous call's pixels into the next.
+  const { canvas: small, ctx: sctx } = getScratch(f.internalW, f.internalH);
+  sctx.clearRect(0, 0, f.internalW, f.internalH);
 
-  const k = INTERNAL_SIZE / DESIGN_SIZE;
+  const k = f.internalW / f.designW;
   sctx.save();
   sctx.scale(k, k);
   sctx.globalCompositeOperation = def.additive ? 'lighter' : 'source-over';
-  const half = DESIGN_SIZE / 2;
   for (const fn of fns) {
-    fn(sctx, progress, def, half, half);
+    // GROUND POINT, not the frame centre — see rasterizeLayer's matching
+    // comment. For SQUARE_FRAME this is (64, 64), byte-identical to before.
+    fn(sctx, progress, def, f.designW / 2, f.groundY);
   }
   // Restores the transform (and composite op) to identity/default before the
   // NEXT call reuses this same context — without this, ctx.scale(k, k) would
@@ -274,7 +304,7 @@ export function drawEffectAt(
   sctx.restore();
 
   // 2. Quantise onto the ramp while still at raster resolution.
-  quantizeToRamp(sctx, INTERNAL_SIZE, def.ramp);
+  quantizeToRamp(sctx, f.internalW, f.internalH, def.ramp);
 
   // 3. Stamp the quantised tile into the caller's context at integer scale,
   //    nearest-neighbour.
@@ -283,11 +313,11 @@ export function drawEffectAt(
     small,
     0,
     0,
-    INTERNAL_SIZE,
-    INTERNAL_SIZE,
-    cx - FRAME_SIZE / 2,
-    cy - FRAME_SIZE / 2,
-    FRAME_SIZE,
-    FRAME_SIZE,
+    f.internalW,
+    f.internalH,
+    destX,
+    destY,
+    f.outW,
+    f.outH,
   );
 }
