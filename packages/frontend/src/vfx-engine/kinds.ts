@@ -23,12 +23,15 @@
 // strokes or fills assigns them itself.
 //
 // ── Frame budget ────────────────────────────────────────────────────────
-// Every kind is rasterized into a FRAME_SIZE (128px) square drawn centred,
-// so anything painted more than 64px from the centre on either axis is hard
-// clipped to a square edge. The largest registered `sizeScale` is 1.5 (the
-// `-lg` variants), which means each kind's geometry constants are tuned so
-// that its worst-case Chebyshev extent — max(|dx|, |dy|) over every painted
-// pixel, including half the stroke width — stays at or below 62px at
+// Every kind is drawn into a DESIGN_SIZE (128px) square centred at
+// (DESIGN_SIZE/2, DESIGN_SIZE/2) — the coordinate space every draw function
+// below writes in (see types.ts). render.ts reduces that down to the actual
+// INTERNAL_SIZE raster via ctx.scale; it never touches these constants.
+// Anything painted more than 64px from the centre on either axis is hard
+// clipped to that square's edge. The largest registered `sizeScale` is 1.5
+// (the `-lg` variants), which means each kind's geometry constants are tuned
+// so that its worst-case Chebyshev extent — max(|dx|, |dy|) over every
+// painted pixel, including half the stroke width — stays at or below 62px at
 // sizeScale 1.5, i.e. roughly 41px at base size. Two extra notes:
 //   * `sizeScale` multiplies distances AND the size-proportional stroke
 //     widths, so sm/base/lg stay visibly distinct (0.6x / 1.0x / 1.5x).
