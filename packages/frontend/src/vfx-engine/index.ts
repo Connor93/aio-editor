@@ -7,4 +7,5 @@ export * from './kinds';
 export * from './palette';
 export * from './registry';
 export * from './render';
+export * from './sheets';
 export * from './types';
