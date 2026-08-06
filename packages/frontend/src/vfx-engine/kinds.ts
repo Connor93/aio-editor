@@ -1254,43 +1254,89 @@ function drawRockfallTint(
 
 // `ring-of-fire`: a sustained, standing ground ring at a FIXED radius — it
 // does not expand like `ring`/`shockwave` — with flame tongues flickering
-// off the band. Uses SQUARE_FRAME (128x128, ground point (64, 64)), not
-// TALL_FRAME: this is a loop (`loops: 3` in SET_PIECES, registry.ts), not a
-// descent, so it has no need of the extra headroom. Budget is the plain
-// SQUARE_FRAME one: <= 62px in every direction from (cx, cy).
+// off the band and a quantised centre wash so the character reads as
+// standing ON burning ground, not under it. Uses GROUND_FRAME (128x128,
+// ground point (64, 64), no body lift), not TALL_FRAME: this is a loop
+// (`loops: 3` in SET_PIECES, registry.ts), not a descent, so it has no need
+// of the extra headroom. Budget is the plain GROUND_FRAME one: <= 62px in
+// every direction from (cx, cy).
 //
-// `behind`/`front` split the ellipse into far/near halves exactly like
-// drawRingBehind/drawRingFront and drawShockwaveBehind/Front above — same
-// angle ranges ([PI, 2*PI] for the far/top half, [0, PI] for the near/bottom
-// half), reused rather than re-derived. No `tint` layer: a sustained ground
-// ring composited 3 loops running would strobe the character three times if
-// it had one, so `tint` is left out of KINDS['ring-of-fire'].draw entirely.
+// `behind`/`front` split the ring band AND the tongues into far/near halves
+// exactly like drawRingBehind/drawRingFront and drawShockwaveBehind/Front
+// above — same angle ranges ([PI, 2*PI] for the far/top half, [0, PI] for
+// the near/bottom half), reused rather than re-derived. The centre fill
+// (drawRingOfFireCentreFill, below) is NOT split this way: it paints the
+// FULL interior ellipse, but ONLY from drawRingOfFireBehind. Being entirely
+// on the `behind` layer means the whole fill composites under the character
+// sprite regardless of which half of the ellipse a given pixel
+// geometrically belongs to — that's what puts the character standing ON
+// the fire instead of the (near) flames drawing over their legs. No `tint`
+// layer: a sustained ground ring composited 3 loops running would strobe
+// the character three times if it had one, so `tint` is left out of
+// KINDS['ring-of-fire'].draw entirely — the centre fill is what gives the
+// ground its glow instead, without the strobe.
 //
-// LOOP SEAMLESSNESS: both the ring's alpha flicker and the tongues' height
-// oscillation are driven by `progress * Math.PI * 2` — an INTEGER (1) cycle
-// per loop. The four sampled progress values (0.125/0.375/0.625/0.875) sit
-// at exactly 45/135/225/315 degrees of phase, i.e. evenly spaced 90 degrees
-// apart — so the step from the last frame of one loop (315deg) back to the
-// first frame of the next (effectively 405deg, i.e. 45deg again) is the SAME
-// 90deg step as every other inter-frame gap. Nothing distinguishes "loop
-// wrapped" from "advanced one frame normally", which is what makes the
-// repeat invisible. A non-integer coefficient (or a coefficient that isn't
-// exactly 1 full cycle per loop) would make the wrap step a different size
-// than the others, reading as a visible pop every 3rd-of-a-second.
+// LOOP SEAMLESSNESS: the ring's alpha flicker, the tongues' height
+// oscillation, and the centre fill's alpha flicker are all driven by
+// `ringOfFireFlicker(progress)` = `progress * Math.PI * 2` — an INTEGER (1)
+// cycle per loop — optionally plus a CONSTANT per-tongue phase offset. The
+// four sampled progress values (0.125/0.375/0.625/0.875) sit at exactly
+// 45/135/225/315 degrees of phase, i.e. evenly spaced 90 degrees apart — so
+// the step from the last frame of one loop (315deg) back to the first frame
+// of the next (effectively 405deg, i.e. 45deg again) is the SAME 90deg step
+// as every other inter-frame gap, for ANY fixed phase offset (a constant
+// offset just relabels which point in the same 4-state cycle is "frame 0").
+// Nothing distinguishes "loop wrapped" from "advanced one frame normally",
+// which is what makes the repeat invisible. A non-integer coefficient (or a
+// coefficient that isn't exactly 1 full cycle per loop) would make the wrap
+// step a different size than the others, reading as a visible pop every
+// 3rd-of-a-second.
 const RING_OF_FIRE_RX = 38; // fixed — does not grow with progress
 const RING_OF_FIRE_RY_FACTOR = 0.42;
 const RING_OF_FIRE_LINE_WIDTH = 3;
 const RING_OF_FIRE_TONGUE_COUNT = 10;
-const RING_OF_FIRE_TONGUE_BASE_H = 9;
-const RING_OF_FIRE_TONGUE_AMP = 8;
-const RING_OF_FIRE_TONGUE_HALF_WIDTH = 2.5;
+const RING_OF_FIRE_TONGUE_BASE_H = 12;
+const RING_OF_FIRE_TONGUE_AMP = 24;
+const RING_OF_FIRE_TONGUE_HALF_WIDTH = 4;
+// Lean and per-tongue phase are both derived from indexFrac (see its doc
+// comment: `i * 2.399`, a golden-angle-style scatter), but at DIFFERENT
+// multipliers of the tongue index — and for phase, a multiplier chosen to
+// dodge a resonance with that 2.399 constant. `5 * 2.399 = 11.995`, i.e.
+// almost exactly 12: an integer. Since indexFrac keeps only the FRACTIONAL
+// part, stepping its argument by a near-integer multiple of 1 barely moves
+// the result — `indexFrac(i * 5 + 1)` (this file's previous formula here)
+// produced 10 phases all within a 0.045-of-a-turn band, a near-unison pulse
+// wearing an index-derived disguise, which is exactly the "pattern, not
+// fire" bug reported after this shipped. `18 * 2.399 = 43.182`, fractional
+// part 0.182 — nowhere near a resonance — and empirically (brute-force
+// checked over multipliers 1-60 against RING_OF_FIRE_TONGUE_COUNT, scoring
+// on worst-case pairwise circular separation) is the best achievable spread
+// for exactly 10 tongues: every pair at least ~32 degrees apart, close to
+// the theoretical ideal of 36 degrees (360/10) for perfectly even points.
+// Do not "simplify" this back to a small multiplier.
+const RING_OF_FIRE_TONGUE_PHASE_MULT = 18;
+const RING_OF_FIRE_TONGUE_LEAN_MULT = 3;
+const RING_OF_FIRE_TONGUE_LEAN_RANGE = 6; // +/- 3px
 
 function ringOfFireRadii(): { rx: number; ry: number } {
   return { rx: RING_OF_FIRE_RX, ry: RING_OF_FIRE_RX * RING_OF_FIRE_RY_FACTOR };
 }
 
-// A short tapering wedge, base on the ring, tip rising toward -y (with a
-// small index-derived lean) — a flame tongue licking up off the band.
+// One flicker clock shared by the tongues and the centre fill — no
+// per-tongue offset here, that's layered on separately where needed. This
+// IS "the same phase source" the centre fill's doc comment promises
+// relative to the tongues.
+function ringOfFireFlicker(progress: number): number {
+  return progress * Math.PI * 2;
+}
+
+// A tapered flame silhouette, four points wound base-left -> base-right ->
+// shoulder -> tip: a flat base where it meets the band, one side bulging
+// into a "shoulder" partway up (the asymmetric flare that reads as a lick
+// rather than a plain wedge), then pulling in to a point that leans
+// outward by `lean`. The shoulder sits further from centre (in x) than the
+// tip across this file's whole parameter range, which keeps the polygon
+// simple (no self-crossing edges).
 function drawFlameTongue(
   ctx: CanvasRenderingContext2D,
   baseX: number,
@@ -1298,9 +1344,11 @@ function drawFlameTongue(
   height: number,
   lean: number,
 ): void {
+  const hw = RING_OF_FIRE_TONGUE_HALF_WIDTH;
   ctx.beginPath();
-  ctx.moveTo(baseX - RING_OF_FIRE_TONGUE_HALF_WIDTH, baseY);
-  ctx.lineTo(baseX + RING_OF_FIRE_TONGUE_HALF_WIDTH, baseY);
+  ctx.moveTo(baseX - hw, baseY);
+  ctx.lineTo(baseX + hw, baseY);
+  ctx.lineTo(baseX + hw * 0.5 + lean * 0.4, baseY - height * 0.55);
   ctx.lineTo(baseX + lean, baseY - height);
   ctx.closePath();
   ctx.fill();
@@ -1319,7 +1367,7 @@ function drawRingOfFireTongues(
 ): void {
   const { rx, ry } = ringOfFireRadii();
   ctx.fillStyle = rung(def, RAMP_BASE + 1);
-  const flicker = progress * Math.PI * 2;
+  const flicker = ringOfFireFlicker(progress);
   for (let i = 0; i < RING_OF_FIRE_TONGUE_COUNT; i++) {
     const angle = (i / RING_OF_FIRE_TONGUE_COUNT) * Math.PI * 2;
     const isBehind = angle >= Math.PI;
@@ -1327,17 +1375,60 @@ function drawRingOfFireTongues(
 
     const baseX = cx + Math.cos(angle) * rx;
     const baseY = cy + Math.sin(angle) * ry;
-    // Per-tongue phase offset so they don't flicker in unison — a constant
+    // Per-tongue phase offset so they flicker independently instead of in
+    // unison — see RING_OF_FIRE_TONGUE_PHASE_MULT's doc comment above for
+    // why 18 (not a small multiplier) is load-bearing here. A constant
     // added phase doesn't change the loop-wrap periodicity (see the note
     // above), so this is safe to derive from the index.
-    const phase = indexFrac(i * 5 + 1) * Math.PI * 2;
+    const phase =
+      indexFrac(i * RING_OF_FIRE_TONGUE_PHASE_MULT + 1) * Math.PI * 2;
     const height =
       RING_OF_FIRE_TONGUE_BASE_H +
       RING_OF_FIRE_TONGUE_AMP * (0.5 + 0.5 * Math.sin(flicker + phase));
-    const lean = (indexFrac(i * 3 + 2) - 0.5) * 4;
+    const lean =
+      (indexFrac(i * RING_OF_FIRE_TONGUE_LEAN_MULT + 2) - 0.5) *
+      RING_OF_FIRE_TONGUE_LEAN_RANGE;
     ctx.globalAlpha = 0.85;
     drawFlameTongue(ctx, baseX, baseY, height, lean);
   }
+}
+
+// Interior wash: a quantised fill covering most of the ring's footprint, a
+// rung duller than the tongues (the "base" rung rather than "hot" —
+// see palette.ts's Ramp doc comment for the shadow/mid/base/hot order) and
+// flickering off the SAME clock as the tongues (ringOfFireFlicker) but at a
+// visibly smaller amplitude (0.15 vs the band's 0.3) — a gentler pulse
+// under the flame licks, not a second set of flames. `behind` ONLY (see the
+// big comment above this section): painting this from drawRingOfFireFront
+// too would put burning ground in front of the character's legs instead of
+// under their feet.
+const RING_OF_FIRE_FILL_RADIUS_FACTOR = 0.8; // fraction of the band's rx/ry
+const RING_OF_FIRE_FILL_ALPHA_BASE = 0.6;
+const RING_OF_FIRE_FILL_ALPHA_AMP = 0.15;
+
+function drawRingOfFireCentreFill(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  const { rx, ry } = ringOfFireRadii();
+  ctx.globalAlpha =
+    RING_OF_FIRE_FILL_ALPHA_BASE +
+    RING_OF_FIRE_FILL_ALPHA_AMP * Math.sin(ringOfFireFlicker(progress));
+  ctx.fillStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    cy,
+    rx * RING_OF_FIRE_FILL_RADIUS_FACTOR,
+    ry * RING_OF_FIRE_FILL_RADIUS_FACTOR,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
 }
 
 function drawRingOfFireBehind(
@@ -1347,11 +1438,18 @@ function drawRingOfFireBehind(
   cx: number,
   cy: number,
 ): void {
+  // Ground glow first — painter's-algorithm base layer. Paint order is
+  // harmless under the 'lighter'/additive composite ring-of-fire uses (see
+  // FLOW_TIMING's `additive: true` below): summing is commutative, so this
+  // could legally go last too. It's placed first because it's logically the
+  // "ground" the band and tongues sit on top of.
+  drawRingOfFireCentreFill(ctx, progress, def, cx, cy);
+
   // Far arc — same half-split as drawRingBehind/drawShockwaveBehind above,
   // just at a fixed (non-expanding) radius. Alpha flickers gently instead of
   // fading with progress — a standing ring, not an impact.
   const { rx, ry } = ringOfFireRadii();
-  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(progress * Math.PI * 2);
+  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(ringOfFireFlicker(progress));
   ctx.lineWidth = RING_OF_FIRE_LINE_WIDTH;
   ctx.strokeStyle = base(def);
   ctx.beginPath();
@@ -1369,8 +1467,10 @@ function drawRingOfFireFront(
   cy: number,
 ): void {
   // Near arc, drawn over the character's feet. Same flicker as the far arc.
+  // No centre fill here — see the big comment above this section: the fill
+  // is `behind`-only by design.
   const { rx, ry } = ringOfFireRadii();
-  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(progress * Math.PI * 2);
+  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(ringOfFireFlicker(progress));
   ctx.lineWidth = RING_OF_FIRE_LINE_WIDTH;
   ctx.strokeStyle = base(def);
   ctx.beginPath();
