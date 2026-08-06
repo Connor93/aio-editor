@@ -5,7 +5,7 @@
 // index instead (e.g. `i * 2.399`). eoweb rasterizes frames to textures
 // while a separate editor animates continuously; both must match.
 //
-// All 15 kinds are implemented here. `ring`, `disc`, `spark-burst` are the
+// All 21 kinds are implemented here. `ring`, `disc`, `spark-burst` are the
 // seed pattern the rest follow: save/restore is handled once by the caller
 // (render.ts) around the whole draw (+ optional combo) call, so individual
 // `draw` functions just set the ctx properties they need — no internal
@@ -749,19 +749,25 @@ function drawBurstLines(
 }
 
 // ── Set pieces ──────────────────────────────────────────────────────────
-// All four set pieces are authored with real art now — Task 4 only wired
+// All six set pieces are authored with real art now — Task 4 only wired
 // the plumbing (all four threw `unimplemented`); Task 5 did `bolt`/`smite`,
-// Task 6 (below the smite functions) does `rockfall`/`ring-of-fire`.
+// Task 6 (below the smite functions) does `rockfall`/`ring-of-fire`, and a
+// later pair of tasks added `cleave`/`swordfall` (below the ring-of-fire
+// functions).
 //
 // `bolt`, `smite` and `rockfall` use TALL_FRAME: draw-space box 128 wide x
 // 256 tall, ground point handed to draw functions as (cx, cy) = (64, 192) —
 // see FrameGeometry / TALL_FRAME in types.ts. `ring-of-fire` is a sustained
 // ground effect, not a descent, so it uses SQUARE_FRAME instead — see its
-// own comment further down for that budget. Set pieces are element-only and
-// size-less (registry.ts's SET_PIECES loop always builds them with
-// sizeScale 1), so unlike every kind above, their geometry constants are
-// NOT multiplied by `def.sizeScale` — there is no sm/lg variant to stay
-// proportional with.
+// own comment further down for that budget. `swordfall` is also a descent —
+// a blade falling from off-screen and planting — so it uses TALL_FRAME too.
+// `cleave`, by contrast, is neither a descent nor a ground effect: it's a
+// swing that lands on the target's body like the kinds above it, so it uses
+// SQUARE_FRAME and keeps the historic body lift (FrameGeometry.bodyLift in
+// types.ts). Set pieces are element-only and size-less (registry.ts's
+// SET_PIECES loop always builds them with sizeScale 1), so unlike every kind
+// above, their geometry constants are NOT multiplied by `def.sizeScale` —
+// there is no sm/lg variant to stay proportional with.
 //
 // Extent budget for TALL_FRAME is ASYMMETRIC and NOT what the original task
 // spec said. The spec's "<=126px above cy" was derived from half the frame
@@ -1526,8 +1532,13 @@ const CLEAVE_START_ANGLE = -0.8 * Math.PI;
 const CLEAVE_SPAN = 1.06 * Math.PI;
 const CLEAVE_LEAD_WIDTH = 11;
 const CLEAVE_TAIL_WIDTH = 1.5;
-// Extent: CLEAVE_RADIUS + CLEAVE_LEAD_WIDTH / 2 = 38.5 of the square frame's
-// 64 design-px half-budget.
+// Extent: worst case is the TINT layer, not the front layer alone —
+// drawCleaveTint's cleaveBand() call passes widthScale: 2.1 (see below), so
+// its extent is CLEAVE_RADIUS + CLEAVE_LEAD_WIDTH * 2.1 / 2 = 44.55 of the
+// square frame's <=62 design-px half-budget (behind, at widthScale 1.6, is
+// 41.8; front, at widthScale 1, is 38.5 — the number this comment used to
+// state as if it were the worst case). Still inside budget, but the real
+// headroom is 17.45px, not the 23.5px the front-only number implied.
 
 /** Which cleave of the flurry `progress` falls in, and how far through it.
  *
@@ -1591,10 +1602,11 @@ function cleaveBand(
     ctx.stroke();
   }
 
+  // ctx.restore() already undoes lineWidth/globalAlpha/strokeStyle/lineCap
+  // (everything this function touched) along with the transform — no manual
+  // reset needed, and one here would clobber a non-default caller state
+  // instead of restoring it.
   ctx.restore();
-  // Restore canvas defaults — a combo layer may be drawn straight after this.
-  ctx.lineWidth = 1;
-  ctx.globalAlpha = 1;
 }
 
 function drawCleaveBehind(
@@ -1659,8 +1671,9 @@ function drawCleaveFront(
       Math.PI * 2,
     );
     ctx.fill();
+    // ctx.restore() already undoes globalAlpha/fillStyle and the transform —
+    // see the same note in cleaveBand above.
     ctx.restore();
-    ctx.globalAlpha = 1;
   }
 }
 
@@ -1687,10 +1700,14 @@ export const SWORDFALL_TOTAL_HEIGHT =
   SWORDFALL_POMMEL_R * 2;
 
 /** How far above the ground the tip starts. Larger than the headroom on
- *  purpose: on the first frame the hilt is above the frame edge and clips,
- *  which reads as the sword entering from off-screen. Every LATER frame is
- *  fully on-screen (see the extent assertion). */
-const SWORDFALL_START_ABOVE = 150;
+ *  purpose: on the first frame the BLADE ITSELF is clipped by the frame
+ *  edge (the hilt is entirely off-frame, further above still), which reads
+ *  as the sword entering from off-screen. Frame 1 — the worst DESCENT
+ *  frame — is separately asserted fully on-screen in
+ *  scripts/vfx-registry-check.ts; the extent assertion next to
+ *  SWORDFALL_TOTAL_HEIGHT only covers the PLANTED frames, so it says
+ *  nothing about the descent on its own. */
+export const SWORDFALL_START_ABOVE = 150;
 const SWORDFALL_LAND_PROGRESS = 0.5;
 
 /** Tip offset above the ground point, and whether the blade has planted. */

@@ -3,7 +3,7 @@
 // layers — a kind x element x size matrix, a curated set of two-kind combos,
 // a handful of fixed "special" effects with hand-tuned params, and a set of
 // element-parameterised, size-less "set piece" effects (bolt, smite,
-// rockfall, ring-of-fire).
+// rockfall, ring-of-fire, cleave, swordfall).
 
 import { KINDS } from './kinds';
 import { ELEMENTS, type ElementKey, type Ramp } from './palette';
@@ -101,8 +101,11 @@ interface SetPieceConfig {
    *  'frames' — multiply `frames`, keeping `loops: 1`, so every cycle is
    *             rasterised separately and CAN differ. Costs textures linearly
    *             in the cycle count; only use it where cycles must differ.
-   *  Inert for shapes with `hasCycles: false`, exactly as `size` is inert for
-   *  set pieces — they still declare it, for uniformity. */
+   *  Only meaningful for shapes with `hasCycles: true`. For `hasCycles:
+   *  false` shapes buildRegistry IGNORES this field and always applies loop
+   *  semantics — enforced in code, not just by convention — so a no-axis
+   *  set piece can declare either value here, exactly as `size` is inert for
+   *  set pieces; 'loop' is kept below as the documented convention. */
   cycleMode: CycleMode;
 }
 
@@ -380,7 +383,16 @@ export function buildRegistry(): Record<string, VfxDef> {
         // frame count alone and repeats. Both yield the same total duration
         // (frames * loops * frameMs), which is why the registry assertions —
         // not the type checker — are what catch a mis-wiring here.
-        const frameMode = cfg.cycleMode === 'frames';
+        //
+        // `cfg.hasCycles &&` is load-bearing, not defensive filler: without
+        // it, a future no-axis shape (like ring-of-fire) declaring
+        // `cycleMode: 'frames'` would fold `count` (== cfg.loops for a
+        // no-axis shape, see `variants` above) into `frames` instead of
+        // `loops` — same total duration, textures multiplied by the loop
+        // count, and a draw function receiving progress spanning every cycle
+        // instead of repeating one. hasCycles:false shapes are always
+        // loop-mode, matching SetPieceConfig.cycleMode's doc comment.
+        const frameMode = cfg.hasCycles && cfg.cycleMode === 'frames';
         registry[`${name}-${element}${suffix ? `-${suffix}` : ''}`] = {
           kind: name,
           ramp: ELEMENTS[element],
@@ -404,7 +416,7 @@ export function buildRegistry(): Record<string, VfxDef> {
 // tsconfig is ES2020.)
 //
 // KIND_KEYS is built from MATRIX_KINDS, NOT Object.keys(KINDS) — KINDS also
-// contains the 4 set-piece kinds, and validating the `kind:` shapeId prefix
+// contains the 6 set-piece kinds, and validating the `kind:` shapeId prefix
 // against the full set would let composeVfxName('kind:bolt', 'fire', 'lg')
 // compose `bolt-fire-lg`, a name buildRegistry() never generates.
 const KIND_KEYS: ReadonlySet<string> = new Set(MATRIX_KINDS);
@@ -543,7 +555,7 @@ export function buildIndex(): Record<string, VfxAxes> {
 }
 
 /** One entry per selectable Shape, in display order: kinds, then combos,
- *  specials, then set pieces. 15 + 8 + 8 + 4 = 35. */
+ *  specials, then set pieces. 15 + 8 + 8 + 6 = 37. */
 export function buildShapes(): VfxShape[] {
   const shapes: VfxShape[] = [];
 
