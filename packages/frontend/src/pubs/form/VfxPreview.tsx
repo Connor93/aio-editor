@@ -5,6 +5,7 @@ import {
   drawEffectAt,
   effectDurationMs,
   FRAME_SIZE,
+  type FrameGeometry,
   frameProgress,
   getSheetDef,
   type SheetDef,
@@ -57,19 +58,35 @@ const STAND_IN_FILL = "#94a3b8"; // slate-400 — deliberately inert/grey, never
 const STAND_IN_SHADOW = "rgba(0, 0, 0, 0.35)";
 
 /** Grey humanoid stand-in (body rect + head circle + soft ground shadow),
- *  feet planted at the canvas centre — the same anchor `drawEffectAt` uses
- *  for the effect itself. Drawn between the `behind` and `tint` layers so
- *  the depth split is actually visible: without something at the anchor
- *  point to occlude/be-occluded, `behind` (paints under the character) and
- *  `front` (paints over it) look identical, and `tint` (blends onto it) has
+ *  feet planted at the def's GROUND POINT — `(outW / 2, outH * anchorY)`,
+ *  the same anchor `drawEffectAt` uses for the effect itself (see
+ *  `compositeFrame` below). For a square frame that's the canvas centre
+ *  (anchorY 0.5, unchanged from before); for a tall frame it sits further
+ *  down, leaving the headroom above free for whatever descends into it.
+ *  Getting this wrong — e.g. leaving the stand-in fixed at the canvas
+ *  centre while a tall effect's ground point moves — makes the depth split
+ *  read wrongly for exactly the effects a tall frame exists for.
+ *
+ *  Sized off `outW`, not `outH`: a tall frame only grows `designH`
+ *  (headroom above the target), never `designW`, so `outW` is the one
+ *  dimension that stays 132 across every frame shape and keeps the
+ *  stand-in's apparent size constant regardless of frame height.
+ *
+ *  Drawn between the `behind` and `tint` layers so the depth split is
+ *  actually visible: without something at the anchor point to
+ *  occlude/be-occluded, `behind` (paints under the character) and `front`
+ *  (paints over it) look identical, and `tint` (blends onto it) has
  *  nothing to blend onto. Not real art — a small caption in the JSX below
  *  says so. */
-function drawCharacterStandIn(ctx: CanvasRenderingContext2D): void {
-  const cx = FRAME_SIZE / 2;
-  const feetY = FRAME_SIZE / 2;
-  const bodyWidth = FRAME_SIZE * 0.16;
-  const bodyHeight = FRAME_SIZE * 0.34;
-  const headRadius = FRAME_SIZE * 0.075;
+function drawCharacterStandIn(
+  ctx: CanvasRenderingContext2D,
+  frame: FrameGeometry,
+): void {
+  const cx = frame.outW / 2;
+  const feetY = frame.outH * frame.anchorY;
+  const bodyWidth = frame.outW * 0.16;
+  const bodyHeight = frame.outW * 0.34;
+  const headRadius = frame.outW * 0.075;
   const bodyTop = feetY - bodyHeight;
 
   ctx.fillStyle = STAND_IN_SHADOW;
@@ -110,7 +127,16 @@ function compositeFrame(
   def: VfxDef,
   progress: number,
 ): void {
-  const half = FRAME_SIZE / 2;
+  // Per-def frame geometry, NOT the global FRAME_SIZE — `layerCanvas` is
+  // already sized to `def.frame.outW x outH` by the caller (see the
+  // layer-canvas setup in the component below), and `ctx` (the visible
+  // canvas) is sized to match via its `width`/`height` attributes in the
+  // JSX. The ground point is `(outW / 2, outH * anchorY)`, the exact pair
+  // `drawEffectAt` expects (see its doc comment in vfx-engine/render.ts) —
+  // for a square frame (anchorY 0.5) that reduces to the old `(half, half)`.
+  const { outW, outH, anchorY } = def.frame;
+  const groundX = outW / 2;
+  const groundY = outH * anchorY;
 
   // `drawEffectAt` sets `imageSmoothingEnabled = false` on the context IT
   // draws into (`layerCtx`, below) and never restores it — it does NOT touch
@@ -120,10 +146,10 @@ function compositeFrame(
   // not inherit whatever the canvas element's smoothing default happens to
   // be at the time.
   ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+  ctx.clearRect(0, 0, outW, outH);
 
-  layerCtx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
-  drawEffectAt(layerCtx, def, progress, half, half, "behind");
+  layerCtx.clearRect(0, 0, outW, outH);
+  drawEffectAt(layerCtx, def, progress, groundX, groundY, "behind");
   ctx.drawImage(layerCanvas, 0, 0);
 
   // Stand-in goes BEFORE tint (occlusion order — a separate axis from the
@@ -135,7 +161,7 @@ function compositeFrame(
   // with what's already there; this ordering controls what's underneath it
   // in the first place. Both have to be right for the preview to predict
   // the game.
-  drawCharacterStandIn(ctx);
+  drawCharacterStandIn(ctx, def.frame);
 
   // `tint` is composited with `lighter` (Canvas2D's additive mode), NOT the
   // `source-over` every other layer here uses — load-bearing, not cosmetic.
@@ -148,14 +174,14 @@ function compositeFrame(
   // opaque source, which every quantised pixel is. Mismatching this is what
   // makes the editor preview lie about "glow vs ugly blob," the one call
   // this whole rework flagged as visually risky for a human to judge.
-  layerCtx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
-  drawEffectAt(layerCtx, def, progress, half, half, "tint");
+  layerCtx.clearRect(0, 0, outW, outH);
+  drawEffectAt(layerCtx, def, progress, groundX, groundY, "tint");
   ctx.globalCompositeOperation = "lighter";
   ctx.drawImage(layerCanvas, 0, 0);
   ctx.globalCompositeOperation = "source-over";
 
-  layerCtx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
-  drawEffectAt(layerCtx, def, progress, half, half, "front");
+  layerCtx.clearRect(0, 0, outW, outH);
+  drawEffectAt(layerCtx, def, progress, groundX, groundY, "front");
   ctx.drawImage(layerCanvas, 0, 0);
 }
 
@@ -197,6 +223,19 @@ export function VfxPreview({ value }: { value: string }) {
   const sheetFailed = sheet ? SHEET_LOAD_FAILED.has(sheet.file) : false;
   const hasPreview = Boolean((sheet && !sheetFailed) || def);
 
+  // The box a procedural def paints into grows with `def.frame` — a tall
+  // def (Task 4) is 132x264, twice the height of the square 132x132 box
+  // every def used before it. Sheets are always square (see sheets.ts) and
+  // the "no preview"/"sheet failed" fallback text has no frame at all, so
+  // both fall back to the global FRAME_SIZE, matching today's fixed box
+  // exactly. The box GROWS to fit a tall def rather than the canvas being
+  // scaled down to a fixed box: this engine's whole point is pixel-exact
+  // nearest-neighbour output, and scaling it to fit would defeat that for
+  // the one case (a descending set piece) a human most needs to judge
+  // accurately.
+  const boxW = def ? def.frame.outW : FRAME_SIZE;
+  const boxH = def ? def.frame.outH : FRAME_SIZE;
+
   // --- Procedural (vfx-engine registry) ---
   useEffect(() => {
     if (!def) return; // sheet / typo / empty — handled elsewhere or not at all
@@ -206,12 +245,23 @@ export function VfxPreview({ value }: { value: string }) {
     if (!ctx) return;
 
     if (!layerCanvasRef.current) {
-      const layerCanvas = document.createElement("canvas");
-      layerCanvas.width = FRAME_SIZE;
-      layerCanvas.height = FRAME_SIZE;
-      layerCanvasRef.current = layerCanvas;
+      layerCanvasRef.current = document.createElement("canvas");
     }
     const layerCanvas = layerCanvasRef.current;
+    // Resize the scratch tile ONLY when `def.frame`'s dimensions actually
+    // differ from what's currently allocated — this effect re-runs on every
+    // `def`/`playing` change (e.g. play/pause, or switching between two
+    // same-sized defs), which is already far less often than the rAF tick
+    // inside `tick` below, but assigning `.width`/`.height` unconditionally
+    // would still reset (clear) the canvas and is worth avoiding on a tile
+    // that's reused across defs and frames precisely to avoid churn.
+    if (
+      layerCanvas.width !== def.frame.outW ||
+      layerCanvas.height !== def.frame.outH
+    ) {
+      layerCanvas.width = def.frame.outW;
+      layerCanvas.height = def.frame.outH;
+    }
     const layerCtx = layerCanvas.getContext("2d");
     if (!layerCtx) return;
 
@@ -345,10 +395,10 @@ export function VfxPreview({ value }: { value: string }) {
       <div className="flex items-center gap-2">
         <div
           className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-slate-700"
-          style={{ width: FRAME_SIZE, height: FRAME_SIZE, ...CHECKER_BACKGROUND }}
+          style={{ width: boxW, height: boxH, ...CHECKER_BACKGROUND }}
         >
           {hasPreview ? (
-            <canvas ref={canvasRef} width={FRAME_SIZE} height={FRAME_SIZE} className="block" />
+            <canvas ref={canvasRef} width={boxW} height={boxH} className="block" />
           ) : sheetFailed ? (
             <span className="px-2 text-center text-[10px] leading-tight text-amber-500/90">
               sheet image
