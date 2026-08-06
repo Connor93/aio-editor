@@ -98,21 +98,100 @@ function indexFrac(i: number): number {
   return v - Math.floor(v);
 }
 
-function drawRing(
+// Task 5: `ring` becomes a squashed ground-plane ellipse around the
+// character's feet, split into a `behind` (far) and `front` (near) arc
+// instead of one full stroked circle — the far side is occluded by the
+// character standing at the centre, the near side draws over their shoes.
+// `rx` keeps the exact pre-Task-5 radius maths (still the wide axis, and
+// still the extent's binding constraint — see drawRingBehind/Front below);
+// only the vertical squash (`ry = rx * 0.42`) and the half-arc split are new.
+function ringRadii(progress: number, def: VfxDef): { rx: number; ry: number } {
+  const rx = progress * 40 * def.sizeScale;
+  return { rx, ry: rx * 0.42 };
+}
+
+function drawRingBehind(
   ctx: CanvasRenderingContext2D,
   progress: number,
   def: VfxDef,
   cx: number,
   cy: number,
 ): void {
-  // 40 * 1.5 + lineWidth/2 = 61.5px extent at -lg.
-  const radius = progress * 40 * def.sizeScale;
+  // Far arc (top half on screen). rx unchanged from before Task 5, so the
+  // extent is still rx + lineWidth/2 = 40 * 1.5 + 1.5 = 61.5px at -lg — the
+  // squash only shrinks ry, which was never the binding axis.
+  const { rx, ry } = ringRadii(progress, def);
   ctx.globalAlpha = 1 - progress;
   ctx.lineWidth = 3;
   ctx.strokeStyle = base(def);
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, rx, ry, 0, Math.PI, Math.PI * 2);
   ctx.stroke();
+}
+
+function drawRingFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Near arc (bottom half on screen, drawn over the character's feet). Same
+  // extent maths as drawRingBehind.
+  const { rx, ry } = ringRadii(progress, def);
+  ctx.globalAlpha = 1 - progress;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI);
+  ctx.stroke();
+}
+
+// Shared by ring's and shockwave's `tint` layer: a soft wash roughly the
+// footprint of a standing character in this same DESIGN_SIZE space.
+// Deliberately NOT multiplied by `def.sizeScale` — a bigger ring doesn't mean
+// a bigger character underneath it — and offset up from the feet-anchored
+// `cy` so it sits over the torso rather than the ground. Extent: dx = 18,
+// dy = 26 + 30 = 56 (filled, no stroke padding), both comfortably under the
+// 62px budget.
+const GROUND_TINT_RX = 18;
+const GROUND_TINT_RY = 30;
+const GROUND_TINT_Y_OFFSET = 26;
+
+function drawGroundTintWash(
+  ctx: CanvasRenderingContext2D,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  ctx.fillStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    cy - GROUND_TINT_Y_OFFSET,
+    GROUND_TINT_RX,
+    GROUND_TINT_RY,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+}
+
+function drawRingTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // At this alpha, quantizeToRamp's luminance*coverage maths (see render.ts)
+  // maps most of this wash's life to either nothing or the ramp's shadow
+  // rung — never the bright/hot end. That's what keeps it a glow instead of
+  // an opaque disc once Task 6 composites `tint` onto the sprite with an
+  // 'add' blend mode: adding a dark colour barely brightens anything.
+  ctx.globalAlpha = (1 - progress) * 0.4;
+  drawGroundTintWash(ctx, def, cx, cy);
 }
 
 function drawDisc(
@@ -336,23 +415,69 @@ function drawNova(
 }
 
 // Flat ground wave: a vertically-squashed ellipse ring expanding outward.
-function drawShockwave(
+// Task 5: already a squashed ground ellipse (unlike ring, which had to gain
+// its squash this task), so the split here is purely the far/near arc
+// division — `rx`/`ry` maths is untouched.
+function shockwaveRadii(
+  progress: number,
+  def: VfxDef,
+): { rx: number; ry: number } {
+  const rx = Math.max(progress * 40 * def.sizeScale, 0.01);
+  return { rx, ry: rx * 0.5 };
+}
+
+function drawShockwaveBehind(
   ctx: CanvasRenderingContext2D,
   progress: number,
   def: VfxDef,
   cx: number,
   cy: number,
 ): void {
-  // 40 * 1.5 + lineWidth/2 = 61.5px extent at -lg (rx is the wide axis).
-  const rx = Math.max(progress * 40 * def.sizeScale, 0.01);
-  const ry = rx * 0.5;
-
+  // Far arc. rx unchanged from before Task 5: extent is still
+  // rx + lineWidth/2 = 40 * 1.5 + 1.5 = 61.5px at -lg.
+  const { rx, ry } = shockwaveRadii(progress, def);
   ctx.globalAlpha = 1 - progress;
   ctx.lineWidth = 3;
   ctx.strokeStyle = base(def);
   ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, rx, ry, 0, Math.PI, Math.PI * 2);
   ctx.stroke();
+}
+
+function drawShockwaveFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Near arc, drawn over the character's feet. Same extent maths as
+  // drawShockwaveBehind.
+  const { rx, ry } = shockwaveRadii(progress, def);
+  ctx.globalAlpha = 1 - progress;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI);
+  ctx.stroke();
+}
+
+function drawShockwaveTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // A brief flash on the impact frames only — a shockwave's hit reads as
+  // instantaneous, not a sustained glow like ring's wash. Gated off past the
+  // midpoint entirely (no draw call at all, not just alpha 0), and even
+  // within progress < 0.5 the alpha decays fast enough that only the very
+  // first frame survives quantizeToRamp's luminance*coverage cut for most
+  // ramps — see drawRingTint's comment for why that's by design, not a bug.
+  if (progress >= 0.5) return;
+  ctx.globalAlpha = (0.5 - progress) * 0.8;
+  drawGroundTintWash(ctx, def, cx, cy);
 }
 
 // A vertical pillar rising from a baseline below `cy`: a gradient-filled
@@ -615,12 +740,22 @@ const FLOW_TIMING = {
 } as const;
 
 export const KINDS: Record<ShapeKind, KindConfig> = {
-  ring: { ...IMPACT_TIMING, draw: { front: drawRing } },
+  ring: {
+    ...IMPACT_TIMING,
+    draw: { behind: drawRingBehind, tint: drawRingTint, front: drawRingFront },
+  },
   disc: { ...IMPACT_TIMING, draw: { front: drawDisc } },
   'spark-burst': { ...IMPACT_TIMING, draw: { front: drawSparkBurst } },
   slash: { ...IMPACT_TIMING, draw: { front: drawSlash } },
   nova: { ...IMPACT_TIMING, draw: { front: drawNova } },
-  shockwave: { ...IMPACT_TIMING, draw: { front: drawShockwave } },
+  shockwave: {
+    ...IMPACT_TIMING,
+    draw: {
+      behind: drawShockwaveBehind,
+      tint: drawShockwaveTint,
+      front: drawShockwaveFront,
+    },
+  },
   implode: { ...IMPACT_TIMING, draw: { front: drawImplode } },
   'burst-lines': { ...IMPACT_TIMING, draw: { front: drawBurstLines } },
   sparkle: { ...FLOW_TIMING, draw: { front: drawSparkle } },
