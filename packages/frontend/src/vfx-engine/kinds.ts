@@ -741,17 +741,20 @@ function drawBurstLines(
   }
 }
 
-// ── Set pieces (Task 5 exemplars) ──────────────────────────────────────
-// `bolt` and `smite` are the first two set pieces authored with real art —
-// Task 4 only wired the plumbing (both threw `unimplemented`). Task 6 fills
-// in `rockfall` and `ring-of-fire`.
+// ── Set pieces ──────────────────────────────────────────────────────────
+// All four set pieces are authored with real art now — Task 4 only wired
+// the plumbing (all four threw `unimplemented`); Task 5 did `bolt`/`smite`,
+// Task 6 (below the smite functions) does `rockfall`/`ring-of-fire`.
 //
-// Both use TALL_FRAME: draw-space box 128 wide x 256 tall, ground point
-// handed to draw functions as (cx, cy) = (64, 192) — see FrameGeometry /
-// TALL_FRAME in types.ts. Set pieces are element-only and size-less
-// (registry.ts's SET_PIECES loop always builds them with sizeScale 1), so
-// unlike every kind above, their geometry constants are NOT multiplied by
-// `def.sizeScale` — there is no sm/lg variant to stay proportional with.
+// `bolt`, `smite` and `rockfall` use TALL_FRAME: draw-space box 128 wide x
+// 256 tall, ground point handed to draw functions as (cx, cy) = (64, 192) —
+// see FrameGeometry / TALL_FRAME in types.ts. `ring-of-fire` is a sustained
+// ground effect, not a descent, so it uses SQUARE_FRAME instead — see its
+// own comment further down for that budget. Set pieces are element-only and
+// size-less (registry.ts's SET_PIECES loop always builds them with
+// sizeScale 1), so unlike every kind above, their geometry constants are
+// NOT multiplied by `def.sizeScale` — there is no sm/lg variant to stay
+// proportional with.
 //
 // Extent budget for TALL_FRAME is ASYMMETRIC and NOT what the original task
 // spec said. The spec's "<=126px above cy" was derived from half the frame
@@ -762,8 +765,8 @@ function drawBurstLines(
 //   horizontal from cx:  +/-64 available -> budget <= 62  (same as SQUARE_FRAME)
 //   above cy (headroom):  192 available  -> budget <= 190
 //   below cy (past the target): 64 available -> budget <= 62
-// Verified with a throwaway instrumented context; see the Task 5 report for
-// the per-element, per-frame, per-layer table.
+// Verified with a throwaway instrumented context; see the Task 5/6 reports
+// for the per-element, per-frame, per-layer table.
 
 // `bolt`: a forked lightning strike. `behind` paints the upper fork (the
 // jagged bolt descending from off-screen), `front` continues it down into
@@ -1025,6 +1028,358 @@ function drawSmiteTint(
   ctx.fill();
 }
 
+// `rockfall`: 3 rocks descending and impacting, staggered so they don't land
+// together. Each rock trails a short tapering MOTION STREAK while it falls —
+// the single most important detail in this task. Four frames is very little
+// runway for a fall (progress is exactly 0.125/0.375/0.625/0.875, sampled at
+// each frame's midpoint — see frameProgress in render.ts), and without the
+// streak a falling rock reads as a jump-cut between four disconnected
+// positions rather than as travel. The streak is filled, not stroked, so it
+// survives quantisation at this raster size the way a thin stroke sometimes
+// doesn't (see the note above drawChains about strokes vanishing under
+// quantizeToRamp at low pixel counts).
+//
+// Each rock has its own [topOffset, landProgress, fallDuration] profile
+// (ROCKFALL_PROFILE), NOT one shared closed form — a hand-tuned table, not
+// indexFrac jitter, because these three numbers are load-bearing for a hard
+// requirement: EVERY sampled frame must paint something in BOTH `behind` and
+// `front` (verified by the Task 6 extent script). A naive shared schedule
+// where all 3 rocks start above the cutoff and all 3 land by frame 3 fails
+// this on both ends — frame 0 (nothing has fallen far enough to cross into
+// `front` yet) and frame 3 (everything has already landed, so nothing is
+// left in `behind`) both come up empty. The fix:
+//   rock 0 — short/close (topOffset 70): already mid-fall and BELOW the
+//     `behind` cutoff on frame 0, landing on frame 1. Guarantees `front`
+//     content from frame 0 onward.
+//   rock 1 — full height (topOffset 150): lands on frame 2, the "middle"
+//     rock, crossing from `behind` to `front` partway through.
+//   rock 2 — full height (topOffset 150), but with a landProgress (1.5)
+//     PAST the sampled range [0.125, 0.875]: it is still audibly mid-fall
+//     on frame 3 and never touches down on screen. Guarantees `behind`
+//     content on every frame, including the last, where rocks 0 and 1 have
+//     both already landed and moved to `front`. Its fall is smooth and
+//     continuous across all 4 samples (137.5 -> 112.5 -> 87.5 -> 62.5, an
+//     even 25px/frame), which also makes it the effect's clearest single
+//     "reads as travel" case.
+// Horizontal position is still index-derived (rockHOffset) and every rock's
+// silhouette/streak jitter is index-derived (drawRockShape) — only these
+// three timing numbers per rock are a fixed table.
+const ROCKFALL_COUNT = 3;
+const ROCKFALL_ROCK_R = 9;
+const ROCKFALL_STREAK_LEN = 26;
+const ROCKFALL_BEHIND_CUTOFF = 40; // rocks above cy - this draw in `behind`, at/below it in `front`
+
+// [topOffset, landProgress, fallDuration] per rock — see the module comment
+// above for why these specific numbers, not indexFrac jitter.
+const ROCKFALL_TOP_OFFSET: readonly number[] = [70, 150, 150];
+const ROCKFALL_LAND_PROGRESS: readonly number[] = [0.375, 0.625, 1.5];
+const ROCKFALL_FALL_DURATION: readonly number[] = [0.5, 0.5, 1.5];
+
+// Rock i's landing progress — 0.375/0.625 for rocks 0/1 (frames 1/2); rock
+// 2's "landing" (1.5) is past the sampled range and never actually occurs
+// on screen (see the module comment above).
+function rockLandProgress(i: number): number {
+  return ROCKFALL_LAND_PROGRESS[i] as number;
+}
+
+// Fixed horizontal slot per rock (-28/0/+28), jittered by the index so the
+// row doesn't look mechanically even. Max |offset| = 28 + 6 = 34; combined
+// with the rock's own radius (<=10.8) that's ~45px, comfortably inside the
+// 62px horizontal budget.
+function rockHOffset(i: number): number {
+  return (i - 1) * 28 + (indexFrac(i * 9 + 4) - 0.5) * 12;
+}
+
+// How far ABOVE cy rock i sits at a given progress: its own topOffset
+// before it starts falling, 0 once it has landed, linearly in between.
+function rockFallOffset(i: number, progress: number): number {
+  const top = ROCKFALL_TOP_OFFSET[i] as number;
+  const landP = rockLandProgress(i);
+  const duration = ROCKFALL_FALL_DURATION[i] as number;
+  const t = (landP - progress) / duration;
+  return top * Math.max(0, Math.min(1, t));
+}
+
+// Small irregular polygon (4 or 5 sides, alternating by rock index) so a
+// rock reads as an angular chunk of stone rather than a ball. Vertex angle
+// and radius jitter derive from the rock index + vertex index via
+// indexFrac — never Math.random — so the same rock always looks the same.
+function drawRockShape(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  i: number,
+): void {
+  const sides = i % 2 === 0 ? 5 : 4;
+  ctx.beginPath();
+  for (let v = 0; v < sides; v++) {
+    const angle = (v / sides) * Math.PI * 2 + (indexFrac(i * 19 + v * 7) - 0.5);
+    const r = ROCKFALL_ROCK_R * (0.7 + indexFrac(i * 13 + v * 5) * 0.5);
+    const px = x + Math.cos(angle) * r;
+    const py = y + Math.sin(angle) * r;
+    if (v === 0) {
+      ctx.moveTo(px, py);
+    } else {
+      ctx.lineTo(px, py);
+    }
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+// THE MOTION STREAK: a short tapering wedge trailing upward from the rock's
+// current position — wide at the rock, narrowing to a point above it. Only
+// drawn while the rock is strictly BETWEEN its waiting-at-top and landed
+// states (0 < fallOffset < ROCKFALL_TOP_OFFSET): a rock that hasn't started
+// falling yet, or has already landed, isn't moving, so it gets no streak.
+// On every frame where a rock IS mid-fall, this is what implies the travel
+// between that frame and the next.
+function drawRockStreak(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+): void {
+  const halfWidth = ROCKFALL_ROCK_R * 0.4;
+  ctx.beginPath();
+  ctx.moveTo(x - halfWidth, y);
+  ctx.lineTo(x + halfWidth, y);
+  ctx.lineTo(x, y - ROCKFALL_STREAK_LEN);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Shared by drawRockfallBehind/Front: paints every rock (+ streak) whose
+// current position belongs to the requested layer. `behind` = still above
+// roughly the character's head (cy - ROCKFALL_BEHIND_CUTOFF, "up near the
+// character's head" per the brief); `front` = at or below that, i.e. close
+// enough to the ground to read as in front of the character. A rock crosses
+// from one layer to the other between frames (there is no mid-frame to
+// crossfade through) — the streak on the frame before the crossing plus the
+// rock's new position after it is what sells the crossing as continuous
+// travel rather than a swap.
+function drawRockfallRocks(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+  wantBehind: boolean,
+): void {
+  ctx.fillStyle = wantBehind ? base(def) : rung(def, RAMP_BASE + 1);
+  for (let i = 0; i < ROCKFALL_COUNT; i++) {
+    const top = ROCKFALL_TOP_OFFSET[i] as number;
+    const fallOffset = rockFallOffset(i, progress);
+    const isBehind = fallOffset > ROCKFALL_BEHIND_CUTOFF;
+    if (isBehind !== wantBehind) continue;
+
+    const x = cx + rockHOffset(i);
+    const y = cy - fallOffset;
+
+    if (fallOffset > 0 && fallOffset < top) {
+      ctx.globalAlpha = wantBehind ? 0.55 : 0.75;
+      drawRockStreak(ctx, x, y);
+    }
+    ctx.globalAlpha = wantBehind ? 0.85 : 1;
+    drawRockShape(ctx, x, y, i);
+  }
+}
+
+function drawRockfallBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  drawRockfallRocks(ctx, progress, def, cx, cy, true);
+}
+
+function drawRockfallFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  drawRockfallRocks(ctx, progress, def, cx, cy, false);
+
+  // Impact puffs: a brief flash at the ground under each rock, on the frame
+  // it lands and the frame after (fading), then gone — not a static puff
+  // that lingers for the rest of the effect once a rock has landed.
+  ctx.fillStyle = rung(def, RAMP_BASE + 1);
+  for (let i = 0; i < ROCKFALL_COUNT; i++) {
+    const framesSinceLand = Math.round((progress - rockLandProgress(i)) / 0.25);
+    let alpha = 0;
+    if (framesSinceLand === 0) alpha = 1;
+    else if (framesSinceLand === 1) alpha = 0.4;
+    if (alpha <= 0) continue;
+
+    const x = cx + rockHOffset(i);
+    const rx = 9;
+    const ry = rx * 0.4;
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawRockfallTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // A brief flash on the frame each rock lands. Landing progress values are
+  // 0.375/0.625 (rocks 0/1 — rockLandProgress; rock 2 never lands on
+  // screen, see the module comment above drawRockShape), i.e. frames 1-2
+  // only — same 0.25 < progress < 0.75 gate as drawBoltTint. No draw call
+  // at all when off, same convention as drawShockwaveTint/drawBoltTint.
+  if (progress <= 0.25 || progress >= 0.75) return;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = rung(def, RAMP_BASE + 1);
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    cy - GROUND_TINT_Y_OFFSET,
+    GROUND_TINT_RX,
+    GROUND_TINT_RY,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+}
+
+// `ring-of-fire`: a sustained, standing ground ring at a FIXED radius — it
+// does not expand like `ring`/`shockwave` — with flame tongues flickering
+// off the band. Uses SQUARE_FRAME (128x128, ground point (64, 64)), not
+// TALL_FRAME: this is a loop (`loops: 3` in SET_PIECES, registry.ts), not a
+// descent, so it has no need of the extra headroom. Budget is the plain
+// SQUARE_FRAME one: <= 62px in every direction from (cx, cy).
+//
+// `behind`/`front` split the ellipse into far/near halves exactly like
+// drawRingBehind/drawRingFront and drawShockwaveBehind/Front above — same
+// angle ranges ([PI, 2*PI] for the far/top half, [0, PI] for the near/bottom
+// half), reused rather than re-derived. No `tint` layer: a sustained ground
+// ring composited 3 loops running would strobe the character three times if
+// it had one, so `tint` is left out of KINDS['ring-of-fire'].draw entirely.
+//
+// LOOP SEAMLESSNESS: both the ring's alpha flicker and the tongues' height
+// oscillation are driven by `progress * Math.PI * 2` — an INTEGER (1) cycle
+// per loop. The four sampled progress values (0.125/0.375/0.625/0.875) sit
+// at exactly 45/135/225/315 degrees of phase, i.e. evenly spaced 90 degrees
+// apart — so the step from the last frame of one loop (315deg) back to the
+// first frame of the next (effectively 405deg, i.e. 45deg again) is the SAME
+// 90deg step as every other inter-frame gap. Nothing distinguishes "loop
+// wrapped" from "advanced one frame normally", which is what makes the
+// repeat invisible. A non-integer coefficient (or a coefficient that isn't
+// exactly 1 full cycle per loop) would make the wrap step a different size
+// than the others, reading as a visible pop every 3rd-of-a-second.
+const RING_OF_FIRE_RX = 38; // fixed — does not grow with progress
+const RING_OF_FIRE_RY_FACTOR = 0.42;
+const RING_OF_FIRE_LINE_WIDTH = 3;
+const RING_OF_FIRE_TONGUE_COUNT = 10;
+const RING_OF_FIRE_TONGUE_BASE_H = 9;
+const RING_OF_FIRE_TONGUE_AMP = 8;
+const RING_OF_FIRE_TONGUE_HALF_WIDTH = 2.5;
+
+function ringOfFireRadii(): { rx: number; ry: number } {
+  return { rx: RING_OF_FIRE_RX, ry: RING_OF_FIRE_RX * RING_OF_FIRE_RY_FACTOR };
+}
+
+// A short tapering wedge, base on the ring, tip rising toward -y (with a
+// small index-derived lean) — a flame tongue licking up off the band.
+function drawFlameTongue(
+  ctx: CanvasRenderingContext2D,
+  baseX: number,
+  baseY: number,
+  height: number,
+  lean: number,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(baseX - RING_OF_FIRE_TONGUE_HALF_WIDTH, baseY);
+  ctx.lineTo(baseX + RING_OF_FIRE_TONGUE_HALF_WIDTH, baseY);
+  ctx.lineTo(baseX + lean, baseY - height);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Tongues rising from the band at index-derived angles, split into the same
+// far/near halves as the ring itself. See the loop-seamlessness note above
+// this section for why the height oscillation is safe to wrap.
+function drawRingOfFireTongues(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+  wantBehind: boolean,
+): void {
+  const { rx, ry } = ringOfFireRadii();
+  ctx.fillStyle = rung(def, RAMP_BASE + 1);
+  const flicker = progress * Math.PI * 2;
+  for (let i = 0; i < RING_OF_FIRE_TONGUE_COUNT; i++) {
+    const angle = (i / RING_OF_FIRE_TONGUE_COUNT) * Math.PI * 2;
+    const isBehind = angle >= Math.PI;
+    if (isBehind !== wantBehind) continue;
+
+    const baseX = cx + Math.cos(angle) * rx;
+    const baseY = cy + Math.sin(angle) * ry;
+    // Per-tongue phase offset so they don't flicker in unison — a constant
+    // added phase doesn't change the loop-wrap periodicity (see the note
+    // above), so this is safe to derive from the index.
+    const phase = indexFrac(i * 5 + 1) * Math.PI * 2;
+    const height =
+      RING_OF_FIRE_TONGUE_BASE_H +
+      RING_OF_FIRE_TONGUE_AMP * (0.5 + 0.5 * Math.sin(flicker + phase));
+    const lean = (indexFrac(i * 3 + 2) - 0.5) * 4;
+    ctx.globalAlpha = 0.85;
+    drawFlameTongue(ctx, baseX, baseY, height, lean);
+  }
+}
+
+function drawRingOfFireBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Far arc — same half-split as drawRingBehind/drawShockwaveBehind above,
+  // just at a fixed (non-expanding) radius. Alpha flickers gently instead of
+  // fading with progress — a standing ring, not an impact.
+  const { rx, ry } = ringOfFireRadii();
+  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(progress * Math.PI * 2);
+  ctx.lineWidth = RING_OF_FIRE_LINE_WIDTH;
+  ctx.strokeStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, Math.PI, Math.PI * 2);
+  ctx.stroke();
+
+  drawRingOfFireTongues(ctx, progress, def, cx, cy, true);
+}
+
+function drawRingOfFireFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Near arc, drawn over the character's feet. Same flicker as the far arc.
+  const { rx, ry } = ringOfFireRadii();
+  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(progress * Math.PI * 2);
+  ctx.lineWidth = RING_OF_FIRE_LINE_WIDTH;
+  ctx.strokeStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI);
+  ctx.stroke();
+
+  drawRingOfFireTongues(ctx, progress, def, cx, cy, false);
+}
+
 // Impacts: short, punchy hits. A single 4-frame cycle, no repeat —
 // 4 * 1 * 100ms = 400ms. Looping an impact reads as sluggish (see the
 // module-level cadence note below), so these get the minimum loop count.
@@ -1095,17 +1450,16 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
   rockfall: {
     ...IMPACT_TIMING,
     draw: {
-      front: () => {
-        throw new Error('unimplemented: rockfall');
-      },
+      behind: drawRockfallBehind,
+      tint: drawRockfallTint,
+      front: drawRockfallFront,
     },
   },
   'ring-of-fire': {
     ...FLOW_TIMING,
     draw: {
-      front: () => {
-        throw new Error('unimplemented: ring-of-fire');
-      },
+      behind: drawRingOfFireBehind,
+      front: drawRingOfFireFront,
     },
   },
 };
