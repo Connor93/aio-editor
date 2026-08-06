@@ -1500,6 +1500,163 @@ function drawRingOfFireFront(
   drawRingOfFireTongues(ctx, progress, def, cx, cy, false);
 }
 
+// ---- cleave ---------------------------------------------------------------
+// A weighted crescent, NOT a literal blade: at 44x44 internal quantised to
+// four rungs a sword mid-swing resolves to a bright stick, so the weight comes
+// from the leading edge being thicker and hotter than the tail. This is the
+// deliberate difference from the `slash` matrix kind, which is one thin
+// tapered stroke with no mass to it (drawSlash, unchanged).
+
+/** Frames the registry allots to ONE cleave. `cycleMode: 'frames'` multiplies
+ *  SET_PIECES.cleave.frames by the cycle count, so this is how a draw call
+ *  recovers how many cleaves it is part of. Asserted equal to the registry's
+ *  base frame count in scripts/vfx-registry-check.ts. */
+export const CLEAVE_FRAMES_PER_CYCLE = 4;
+
+const CLEAVE_RADIUS = 33;
+const CLEAVE_SEGMENTS = 20;
+const CLEAVE_START_ANGLE = -0.8 * Math.PI;
+const CLEAVE_SPAN = 1.06 * Math.PI;
+const CLEAVE_LEAD_WIDTH = 11;
+const CLEAVE_TAIL_WIDTH = 1.5;
+// Extent: CLEAVE_RADIUS + CLEAVE_LEAD_WIDTH / 2 = 38.5 of the square frame's
+// 64 design-px half-budget.
+
+/** Which cleave of the flurry `progress` falls in, and how far through it.
+ *
+ *  Cycle geometry is derived from the cycle INDEX arithmetically — never
+ *  through indexFrac. indexFrac's own 2.399 constant aliased ring-of-fire's
+ *  ten tongues into a 16.2 degree band while looking independent in source;
+ *  that bug is not worth repeating for three values. */
+function cleavePhase(
+  def: VfxDef,
+  progress: number,
+): { t: number; mirror: boolean; rotate: number } {
+  const count = Math.max(1, Math.round(def.frames / CLEAVE_FRAMES_PER_CYCLE));
+  const scaled = progress * count;
+  // Math.min guards the progress === 1 endpoint. frameProgress samples frame
+  // midpoints so it never actually reaches 1, but drawEffectAt is also called
+  // directly by the aio-editor preview's scrubber.
+  const index = Math.min(count - 1, Math.floor(scaled));
+  return {
+    t: scaled - index,
+    // Cleave 2 is the mirror of cleave 1 — that is what makes the X.
+    mirror: index % 2 === 1,
+    // Cleave 3 comes in steeper rather than mirroring back onto cleave 1.
+    rotate: index === 2 ? -0.2 * Math.PI : 0,
+  };
+}
+
+/** Strokes one crescent: a band along CLEAVE_RADIUS from the sweep's start to
+ *  its current leading edge, thickening and brightening toward that edge. */
+function cleaveBand(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  phase: { t: number; mirror: boolean; rotate: number },
+  colour: string,
+  widthScale: number,
+  alphaScale: number,
+): void {
+  const lead = CLEAVE_START_ANGLE + phase.t * CLEAVE_SPAN;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (phase.rotate !== 0) ctx.rotate(phase.rotate);
+  if (phase.mirror) ctx.scale(-1, 1);
+  ctx.translate(-cx, -cy);
+
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = colour;
+  for (let i = 0; i < CLEAVE_SEGMENTS; i++) {
+    const f = i / CLEAVE_SEGMENTS;
+    const a0 = CLEAVE_START_ANGLE + (lead - CLEAVE_START_ANGLE) * f;
+    const a1 =
+      CLEAVE_START_ANGLE +
+      (lead - CLEAVE_START_ANGLE) * ((i + 1) / CLEAVE_SEGMENTS);
+    ctx.lineWidth =
+      (CLEAVE_TAIL_WIDTH + (CLEAVE_LEAD_WIDTH - CLEAVE_TAIL_WIDTH) * f) *
+      widthScale;
+    // Tail is faint, leading edge solid; the whole band fades as it completes.
+    ctx.globalAlpha = (0.2 + 0.8 * f) * alphaScale * (1 - phase.t * 0.35);
+    ctx.beginPath();
+    ctx.arc(cx, cy, CLEAVE_RADIUS, a0, a1);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+  // Restore canvas defaults — a combo layer may be drawn straight after this.
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
+}
+
+function drawCleaveBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Wider and dimmer than the front core, so the tail reads as passing BEHIND
+  // the target rather than across it.
+  cleaveBand(ctx, cx, cy, cleavePhase(def, progress), base(def), 1.6, 0.45);
+}
+
+function drawCleaveTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Additive bloom onto the target. Low alpha: the tint layer is composited
+  // `add` regardless of def.additive, so anything heavy here blows out.
+  cleaveBand(
+    ctx,
+    cx,
+    cy,
+    cleavePhase(def, progress),
+    rung(def, RAMP_BASE + 1),
+    2.1,
+    0.3,
+  );
+}
+
+function drawCleaveFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  const phase = cleavePhase(def, progress);
+  cleaveBand(ctx, cx, cy, phase, rung(def, RAMP_BASE + 1), 1, 1);
+
+  // Spark flash at maximum extension — the moment the edge bites. Confined to
+  // the back half of each cleave so a flurry flashes once per cycle.
+  if (phase.t > 0.5) {
+    const lead = CLEAVE_START_ANGLE + phase.t * CLEAVE_SPAN;
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (phase.rotate !== 0) ctx.rotate(phase.rotate);
+    if (phase.mirror) ctx.scale(-1, 1);
+    ctx.translate(-cx, -cy);
+    ctx.globalAlpha = 1 - (phase.t - 0.5) * 2;
+    ctx.fillStyle = rung(def, RAMP_BASE + 2);
+    ctx.beginPath();
+    ctx.arc(
+      cx + Math.cos(lead) * CLEAVE_RADIUS,
+      cy + Math.sin(lead) * CLEAVE_RADIUS,
+      4,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+}
+
 // Impacts: short, punchy hits. A single 4-frame cycle, no repeat —
 // 4 * 1 * 100ms = 400ms. Looping an impact reads as sluggish (see the
 // module-level cadence note below), so these get the minimum loop count.
@@ -1577,6 +1734,14 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
     draw: {
       behind: drawRingOfFireBehind,
       front: drawRingOfFireFront,
+    },
+  },
+  cleave: {
+    ...IMPACT_TIMING,
+    draw: {
+      behind: drawCleaveBehind,
+      tint: drawCleaveTint,
+      front: drawCleaveFront,
     },
   },
 };

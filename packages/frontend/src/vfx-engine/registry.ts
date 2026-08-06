@@ -64,7 +64,7 @@ const COMBOS: ReadonlyArray<readonly [ShapeKind, ShapeKind]> = [
   ['orbit', 'sparkle'],
 ];
 
-type SetPieceName = 'bolt' | 'smite' | 'rockfall' | 'ring-of-fire';
+type SetPieceName = 'bolt' | 'smite' | 'rockfall' | 'ring-of-fire' | 'cleave';
 
 export type CycleKey = 1 | 2 | 3;
 
@@ -142,6 +142,19 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     frameMs: 100,
     hasCycles: false,
     cycleMode: 'loop',
+  },
+  // SQUARE_FRAME, so it carries the body lift and lands on the target's body
+  // like the effects it accompanies — it is a swing, not a ground effect.
+  // cycleMode 'frames': -x2 mirrors into an X, -x3 adds a steeper third, so
+  // the cycles cannot be a repeat. Costs textures (12 frames x 3 layers at
+  // -x3), paid lazily per name actually cast.
+  cleave: {
+    frame: SQUARE_FRAME,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
+    hasCycles: true,
+    cycleMode: 'frames',
   },
 };
 

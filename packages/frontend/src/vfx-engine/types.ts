@@ -28,7 +28,8 @@ export type ShapeKind =
   | 'bolt'
   | 'smite'
   | 'rockfall'
-  | 'ring-of-fire';
+  | 'ring-of-fire'
+  | 'cleave';
 
 // The three depth passes an effect can paint into, relative to the
 // character sprite: 'behind' composites under them, 'tint' blends onto them
