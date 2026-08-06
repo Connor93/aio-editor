@@ -4,7 +4,7 @@
 // and a handful of fixed "special" effects with hand-tuned params.
 
 import { KINDS } from './kinds';
-import { ELEMENTS, type ElementKey } from './palette';
+import { ELEMENTS, type ElementKey, type Ramp } from './palette';
 import type { ShapeKind, VfxDef } from './types';
 
 export type VfxLayer = 'matrix' | 'combo' | 'special';
@@ -33,12 +33,43 @@ const COMBOS: ReadonlyArray<readonly [ShapeKind, ShapeKind]> = [
   ['orbit', 'sparkle'],
 ];
 
+// Keys mirror SPECIALS below. A literal union (not `Record<string, Ramp>`)
+// so `SPECIAL_RAMPS['heal-glow']` types as `Ramp`, never `Ramp | undefined`
+// — aio-editor's stricter tsconfig (`noUncheckedIndexedAccess`, which this
+// repo doesn't set) only widens generic string-index-signature lookups, not
+// property access through a finite literal key union.
+type SpecialName =
+  | 'heal-glow'
+  | 'buff-aura'
+  | 'debuff-sink'
+  | 'shield-flash'
+  | 'cast-arcane'
+  | 'level-up'
+  | 'crit-flash'
+  | 'stun-stars';
+
+// Hardcoded ramps for the specials below — they sit outside the element
+// table, so they carry their own shadow/mid/base/hot rungs rather than
+// looking one up from `ELEMENTS`.
+const SPECIAL_RAMPS: Record<SpecialName, Ramp> = {
+  'heal-glow': [0x14532d, 0x16a34a, 0x86efac, 0xdcfce7],
+  'buff-aura': [0x78350f, 0xd97706, 0xffcc44, 0xfef3c7],
+  'debuff-sink': [0x3b0764, 0x7c3aed, 0xa855f7, 0xddd6fe],
+  'shield-flash': [0x1e3a8a, 0x3b82f6, 0x93c5fd, 0xdbeafe],
+  'cast-arcane': [0x4c1d95, 0x8b5cf6, 0xc4b5fd, 0xede9fe],
+  'level-up': [0xa16207, 0xeab308, 0xfde047, 0xfefce8],
+  // Pure white has nowhere to ramp UP, so it ramps toward a warm off-white
+  // instead of staying flat — otherwise quantisation collapses it to one rung.
+  'crit-flash': [0x78716c, 0xd6d3d1, 0xffffff, 0xffffff],
+  'stun-stars': [0xa16207, 0xeab308, 0xfde047, 0xfefce8],
+};
+
 // Fixed, hand-tuned effects that don't fit the element matrix (heals,
 // buffs, crits, ...).
 const SPECIALS: Record<string, VfxDef> = {
   'heal-glow': {
     kind: 'disc',
-    color: 0x86efac,
+    ramp: SPECIAL_RAMPS['heal-glow'],
     sizeScale: 1,
     durationMs: 900,
     additive: true,
@@ -46,7 +77,7 @@ const SPECIALS: Record<string, VfxDef> = {
   },
   'buff-aura': {
     kind: 'ring',
-    color: 0xffcc44,
+    ramp: SPECIAL_RAMPS['buff-aura'],
     sizeScale: 1,
     durationMs: 700,
     additive: true,
@@ -54,7 +85,7 @@ const SPECIALS: Record<string, VfxDef> = {
   },
   'debuff-sink': {
     kind: 'implode',
-    color: 0xa855f7,
+    ramp: SPECIAL_RAMPS['debuff-sink'],
     sizeScale: 1,
     durationMs: 350,
     additive: true,
@@ -62,7 +93,7 @@ const SPECIALS: Record<string, VfxDef> = {
   },
   'shield-flash': {
     kind: 'shockwave',
-    color: 0x93c5fd,
+    ramp: SPECIAL_RAMPS['shield-flash'],
     sizeScale: 1,
     durationMs: 350,
     additive: true,
@@ -70,7 +101,7 @@ const SPECIALS: Record<string, VfxDef> = {
   },
   'cast-arcane': {
     kind: 'spiral',
-    color: 0xc4b5fd,
+    ramp: SPECIAL_RAMPS['cast-arcane'],
     sizeScale: 1,
     durationMs: 500,
     additive: true,
@@ -78,7 +109,7 @@ const SPECIALS: Record<string, VfxDef> = {
   },
   'level-up': {
     kind: 'beam-pop',
-    color: 0xfde047,
+    ramp: SPECIAL_RAMPS['level-up'],
     sizeScale: 1,
     durationMs: 500,
     additive: true,
@@ -86,7 +117,7 @@ const SPECIALS: Record<string, VfxDef> = {
   },
   'crit-flash': {
     kind: 'nova',
-    color: 0xffffff,
+    ramp: SPECIAL_RAMPS['crit-flash'],
     sizeScale: 1,
     durationMs: 180,
     additive: true,
@@ -94,7 +125,7 @@ const SPECIALS: Record<string, VfxDef> = {
   },
   'stun-stars': {
     kind: 'orbit',
-    color: 0xfde047,
+    ramp: SPECIAL_RAMPS['stun-stars'],
     sizeScale: 1,
     durationMs: 500,
     additive: true,
@@ -120,7 +151,7 @@ export function buildRegistry(): Record<string, VfxDef> {
         const name = `${kind}-${element}${suffix ? `-${suffix}` : ''}`;
         registry[name] = {
           kind,
-          color: ELEMENTS[element],
+          ramp: ELEMENTS[element],
           sizeScale,
           durationMs: config.durationMs,
           additive: config.additive,
@@ -137,7 +168,7 @@ export function buildRegistry(): Record<string, VfxDef> {
       const name = `${kindA}-${kindB}-${element}`;
       registry[name] = {
         kind: kindA,
-        color: ELEMENTS[element],
+        ramp: ELEMENTS[element],
         sizeScale: 1,
         durationMs: config.durationMs,
         additive: config.additive,

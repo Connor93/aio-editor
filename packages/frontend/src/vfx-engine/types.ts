@@ -2,6 +2,8 @@
 // Core shapes + effect definition. Framework-agnostic (Canvas2D + plain TS
 // only) so this module can be vendored verbatim into another repository.
 
+import type { Ramp } from './palette';
+
 export type ShapeKind =
   | 'ring'
   | 'disc'
@@ -21,7 +23,7 @@ export type ShapeKind =
 
 export interface VfxDef {
   kind: ShapeKind;
-  color: number; // 0xRRGGBB
+  ramp: Ramp; // shadow/mid/base/hot — was: color: number
   sizeScale: number; // 0.6 sm / 1.0 base / 1.5 lg
   durationMs: number;
   additive: boolean;
