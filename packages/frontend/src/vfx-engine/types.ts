@@ -114,16 +114,31 @@ export interface FrameGeometry {
   outW: number;
   outH: number;
   anchorY: number;
+  bodyLift: boolean;
 }
 
 /** Derives raster + output sizes from a draw-space box. The integer-upscale
  *  rule applies PER AXIS — a fractional ratio on either produces pixels of
  *  uneven size. Pick design dimensions that are whole multiples of
- *  DESIGN_SIZE/INTERNAL_SIZE (i.e. multiples of 32) so both axes stay exact. */
+ *  DESIGN_SIZE/INTERNAL_SIZE (i.e. multiples of 32) so both axes stay exact.
+ *
+ *  `bodyLift`: whether this frame's burst gets the historic 20px body lift.
+ *  TRUE only for SQUARE_FRAME — the 379 effects that predate FrameGeometry
+ *  are authored as blobs centred on the character's BODY, and the lift is
+ *  what puts them there. A frame carrying its own meaningful ground point
+ *  (TALL_FRAME) or an effect that belongs on the floor (GROUND_FRAME) must
+ *  NOT be lifted.
+ *
+ *  This used to be inferred in playBurst as `anchorY === 0.5`, which is why
+ *  ring-of-fire floated at chest height: it is square, so its anchorY is
+ *  exactly 0.5, and it inherited a rule meant for body-centred blobs. Intent
+ *  is now stated rather than guessed — and the float comparison (which only
+ *  worked because 64/128 is exact in binary) is gone. */
 function makeFrame(
   designW: number,
   designH: number,
   groundY: number,
+  bodyLift: boolean,
 ): FrameGeometry {
   const k = INTERNAL_SIZE / DESIGN_SIZE;
   const internalW = Math.round(designW * k);
@@ -137,16 +152,27 @@ function makeFrame(
     outW: internalW * PIXEL_SCALE,
     outH: internalH * PIXEL_SCALE,
     anchorY: groundY / designH,
+    bodyLift,
   };
 }
 
 /** Every effect that existed before set pieces. 128x128 design -> 44x44 raster
- *  -> 132x132 output, ground point dead centre. Identical to the old globals. */
-export const SQUARE_FRAME: FrameGeometry = makeFrame(128, 128, 64);
+ *  -> 132x132 output, ground point dead centre. Identical to the old globals.
+ *  bodyLift: true — see makeFrame's doc comment above. */
+export const SQUARE_FRAME: FrameGeometry = makeFrame(128, 128, 64, true);
+
+/** Dimensionally identical to SQUARE_FRAME; differs ONLY in bodyLift, so a
+ *  square effect can sit on the ground instead of at body height. Currently
+ *  used by `ring-of-fire` only — a sustained ground effect that happens to
+ *  use a square frame, and must not inherit the body-blob lift just because
+ *  its anchorY is also 0.5. */
+export const GROUND_FRAME: FrameGeometry = makeFrame(128, 128, 64, false);
 
 /** Descents. 128x256 design -> 44x88 raster -> 132x264 output. The ground
  *  point is at y=192, so the bottom 128 design-px occupy exactly where a
  *  square frame would sit and the top 128 are headroom. anchorY = 0.75.
+ *  bodyLift: false — the frame already carries its own meaningful ground
+ *  point; lifting it would float the impact above the target's feet.
  *
  *  Extent budget for draw functions here is ASYMMETRIC, unlike
  *  SQUARE_FRAME's uniform "Chebyshev extent <= 62px at sizeScale 1.5" (see
@@ -157,4 +183,4 @@ export const SQUARE_FRAME: FrameGeometry = makeFrame(128, 128, 64);
  *    below cy (past the target):    64 available -> budget <= 62
  *  See kinds.ts's "Set pieces" header for the per-kind draw functions tuned
  *  to this budget. */
-export const TALL_FRAME: FrameGeometry = makeFrame(128, 256, 192);
+export const TALL_FRAME: FrameGeometry = makeFrame(128, 256, 192, false);

@@ -9,6 +9,7 @@ import { KINDS } from './kinds';
 import { ELEMENTS, type ElementKey, type Ramp } from './palette';
 import {
   type FrameGeometry,
+  GROUND_FRAME,
   type ShapeKind,
   SQUARE_FRAME,
   TALL_FRAME,
@@ -75,13 +76,15 @@ interface SetPieceConfig {
 /** Element-parameterised, size-less. Descents are FAST (400ms) on purpose:
  *  skills have no cast time, so damage and impact_vfx resolve together and a
  *  slow descent would land its impact after the damage number had already
- *  popped. `ring-of-fire` is a sustained ground effect, so it keeps the square
- *  frame and loops. */
+ *  popped. `ring-of-fire` is a sustained ground effect, so it keeps the
+ *  square DIMENSIONS and loops — but uses GROUND_FRAME, not SQUARE_FRAME, so
+ *  it burns on the floor instead of inheriting the body-blob lift (see
+ *  GROUND_FRAME's doc comment in types.ts). */
 const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
   bolt: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
   smite: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
   rockfall: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
-  'ring-of-fire': { frame: SQUARE_FRAME, frames: 4, loops: 3, frameMs: 100 },
+  'ring-of-fire': { frame: GROUND_FRAME, frames: 4, loops: 3, frameMs: 100 },
 };
 
 // Keys mirror SPECIALS below. A literal union (not `Record<string, Ramp>`)
