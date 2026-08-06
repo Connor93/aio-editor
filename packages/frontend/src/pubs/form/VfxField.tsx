@@ -6,6 +6,7 @@ import {
   composeVfxName,
   ELEMENTS,
   type ElementKey,
+  RAMP_BASE,
   type SizeKey,
   type VfxAxes,
   type VfxShape,
@@ -170,7 +171,7 @@ export function VfxField({
               disabled={!hasElement}
               onClick={() => pickElement(el)}
               title={el}
-              style={{ backgroundColor: hex(ELEMENTS[el]) }}
+              style={{ backgroundColor: hex(ELEMENTS[el][RAMP_BASE]) }}
               className={`h-5 w-5 rounded-full border transition disabled:opacity-25 ${
                 sel.element === el
                   ? "border-slate-100 ring-2 ring-slate-400/70"

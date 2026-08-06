@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   buildRegistry,
   drawEffectAt,
+  effectDurationMs,
   FRAME_SIZE,
+  frameProgress,
   getSheetDef,
   type SheetDef,
   sheetDurationMs,
@@ -51,6 +53,89 @@ const CHECKER_BACKGROUND = {
   backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
 } as const;
 
+const STAND_IN_FILL = "#94a3b8"; // slate-400 — deliberately inert/grey, never mistaken for real art
+const STAND_IN_SHADOW = "rgba(0, 0, 0, 0.35)";
+
+/** Grey humanoid stand-in (body rect + head circle + soft ground shadow),
+ *  feet planted at the canvas centre — the same anchor `drawEffectAt` uses
+ *  for the effect itself. Drawn between the `behind` and `tint` layers so
+ *  the depth split is actually visible: without something at the anchor
+ *  point to occlude/be-occluded, `behind` (paints under the character) and
+ *  `front` (paints over it) look identical, and `tint` (blends onto it) has
+ *  nothing to blend onto. Not real art — a small caption in the JSX below
+ *  says so. */
+function drawCharacterStandIn(ctx: CanvasRenderingContext2D): void {
+  const cx = FRAME_SIZE / 2;
+  const feetY = FRAME_SIZE / 2;
+  const bodyWidth = FRAME_SIZE * 0.16;
+  const bodyHeight = FRAME_SIZE * 0.34;
+  const headRadius = FRAME_SIZE * 0.075;
+  const bodyTop = feetY - bodyHeight;
+
+  ctx.fillStyle = STAND_IN_SHADOW;
+  ctx.beginPath();
+  ctx.ellipse(cx, feetY, bodyWidth * 1.2, bodyWidth * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = STAND_IN_FILL;
+  ctx.fillRect(cx - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+  ctx.beginPath();
+  ctx.arc(cx, bodyTop - headRadius, headRadius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** Composites one already-frame-quantised `progress` onto `ctx` in depth
+ *  order: `behind` -> character stand-in -> `tint` -> `front`, mirroring
+ *  eoweb's 3-sprite `SkillBurst` (behind under the target, tint blended onto
+ *  it, front over it), one `drawEffectAt` call per layer.
+ *
+ *  `layerCanvas`/`layerCtx` is a reused scratch tile, NOT `ctx` itself:
+ *  `drawEffectAt` unconditionally `clearRect`s its own working region before
+ *  painting (see vfx-engine/render.ts) so a caller can reuse a persistent
+ *  context frame-to-frame without ghosting — but that means three direct
+ *  calls onto the SAME `ctx` would each wipe out the layer(s) drawn just
+ *  before it, leaving only `front` visible. Routing each layer through its
+ *  own scratch tile first and compositing that onto `ctx` with a plain
+ *  `drawImage` (source-over, alpha-respecting, no clear) is what actually
+ *  lets `behind`/the stand-in/`tint` survive underneath what's drawn next. */
+function compositeFrame(
+  ctx: CanvasRenderingContext2D,
+  layerCanvas: HTMLCanvasElement,
+  layerCtx: CanvasRenderingContext2D,
+  def: VfxDef,
+  progress: number,
+): void {
+  const half = FRAME_SIZE / 2;
+
+  // `drawEffectAt` sets `imageSmoothingEnabled = false` on the context IT
+  // draws into (`layerCtx`, below) and never restores it — it does NOT touch
+  // `ctx`. Set it here explicitly rather than relying on that as a side
+  // effect: the stand-in (plain fillRect/arc calls) and every `drawImage`
+  // composite below should deliberately stay nearest-neighbour/pixel-art,
+  // not inherit whatever the canvas element's smoothing default happens to
+  // be at the time.
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+
+  layerCtx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+  drawEffectAt(layerCtx, def, progress, half, half, "behind");
+  ctx.drawImage(layerCanvas, 0, 0);
+
+  // Stand-in goes BEFORE tint (not after) so a tint with content visibly
+  // flashes over/occludes it — drawing it after tint would hide the exact
+  // thing Task 7's brief calls out: the tint layer resolves to a hard-edged
+  // quantised colour patch, not a soft glow, and that has to stay visible.
+  drawCharacterStandIn(ctx);
+
+  layerCtx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+  drawEffectAt(layerCtx, def, progress, half, half, "tint");
+  ctx.drawImage(layerCanvas, 0, 0);
+
+  layerCtx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+  drawEffectAt(layerCtx, def, progress, half, half, "front");
+  ctx.drawImage(layerCanvas, 0, 0);
+}
+
 /** Live preview of a `cast_vfx`/`impact_vfx` name.
  *
  *  Two kinds of effect render here, and they resolve in this order — the same
@@ -58,19 +143,25 @@ const CHECKER_BACKGROUND = {
  *  disagree about what a name means:
  *    1. a curated sprite SHEET (`cast-burst`, `fire-impact`) — a horizontal
  *       PNG strip, stepped frame by frame with `drawImage`;
- *    2. a GENERATED effect from the vfx-engine registry, drawn procedurally.
+ *    2. a GENERATED effect from the vfx-engine registry, drawn procedurally
+ *       across three composited depth layers (see `compositeFrame`).
  *  A typo or an empty field matches neither and falls back to a muted "no
  *  preview" state rather than an error or a blank canvas. */
 export function VfxPreview({ value }: { value: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** Reused scratch tile for compositing one depth layer at a time — see
+   *  `compositeFrame`'s doc comment for why this can't just be `ctx` itself.
+   *  Created lazily (first procedural paint), not at module scope: unlike
+   *  `VFX_REGISTRY`, this needs `document` and must not run in a headless
+   *  import context. Reused across frames AND across defs, since it's just a
+   *  transient scratch buffer cleared before every use. */
+  const layerCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [playing, setPlaying] = useState(true);
-  /** Progress of the most recently painted frame, so pausing can re-paint
-   *  THAT frame. Drawing a fixed `0` instead would blank the canvas for the
-   *  7 kinds whose progress-0 geometry is degenerate (`ring`, `disc`,
-   *  `spark-burst`, `shockwave`, `burst-lines`, `beam-pop`, `chains` all
-   *  have zero radius/length/height there) — the exact opposite of what a
-   *  pause button is for. A ref, not state: the rAF tick writes it every
-   *  frame and must not re-render the component to do so. */
+  /** Progress of the most recently painted frame, as a fraction (0..1) of
+   *  the effect's total playback time (`effectDurationMs(def)`), so pausing
+   *  can re-paint THAT exact frame and resuming can pick up from it rather
+   *  than snapping back to the start. A ref, not state: the rAF tick writes
+   *  it every frame and must not re-render the component to do so. */
   const progressRef = useRef(0);
 
   /** Bumped when a sheet image fails, so the failure (recorded in a module-level
@@ -91,22 +182,49 @@ export function VfxPreview({ value }: { value: string }) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const half = FRAME_SIZE / 2;
+    if (!layerCanvasRef.current) {
+      const layerCanvas = document.createElement("canvas");
+      layerCanvas.width = FRAME_SIZE;
+      layerCanvas.height = FRAME_SIZE;
+      layerCanvasRef.current = layerCanvas;
+    }
+    const layerCanvas = layerCanvasRef.current;
+    const layerCtx = layerCanvas.getContext("2d");
+    if (!layerCtx) return;
+
+    // Cadence is `frames * loops * frameMs`: the engine rasterises ONE cycle
+    // and repeating it is the consumer's job (see effectDurationMs's doc
+    // comment). eoweb's SkillBurst advances as
+    // `floor(elapsedMs / frameMs) % frames` across `frames * loops` steps —
+    // this mirrors that exactly (frameProgress internally wraps the index by
+    // `def.frames`, same as SkillBurst's `% layer.frames.length`), so a
+    // 4-frame/loops:3 effect visibly plays 4 discrete frames three times
+    // over `effectDurationMs(def)`, not one smooth pass. The whole preview
+    // then loops by wrapping `elapsed` itself, since (unlike a one-shot
+    // combat burst) there's no "finished" state here — it must keep playing.
+    const totalMs = effectDurationMs(def);
+
+    const paint = (fraction: number) => {
+      const elapsedMs = fraction * totalMs;
+      const frameIndex = Math.floor(elapsedMs / def.frameMs);
+      const progress = frameProgress(def, frameIndex);
+      compositeFrame(ctx, layerCanvas, layerCtx, def, progress);
+    };
 
     if (!playing) {
       // Freeze on the last frame the loop actually rendered; no rAF to cancel.
-      drawEffectAt(ctx, def, progressRef.current, half, half);
+      paint(progressRef.current);
       return;
     }
 
     let rafId = 0;
     // Back-date the clock by the frozen progress so ▶ RESUMES from where ⏸
     // stopped instead of snapping back to the start of the effect.
-    const start = performance.now() - progressRef.current * def.durationMs;
+    const start = performance.now() - progressRef.current * totalMs;
     const tick = (now: number) => {
-      const progress = ((now - start) / def.durationMs) % 1;
-      progressRef.current = progress;
-      drawEffectAt(ctx, def, progress, half, half);
+      const elapsedMs = (now - start) % totalMs;
+      progressRef.current = elapsedMs / totalMs;
+      paint(progressRef.current);
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
@@ -200,38 +318,45 @@ export function VfxPreview({ value }: { value: string }) {
   }, [sheet, playing]);
 
   return (
-    <div className="mt-1 flex items-center gap-2">
-      <div
-        className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-slate-700"
-        style={{ width: FRAME_SIZE, height: FRAME_SIZE, ...CHECKER_BACKGROUND }}
-      >
-        {hasPreview ? (
-          <canvas ref={canvasRef} width={FRAME_SIZE} height={FRAME_SIZE} className="block" />
-        ) : sheetFailed ? (
-          <span className="px-2 text-center text-[10px] leading-tight text-amber-500/90">
-            sheet image
-            <br />
-            failed to load
-            <br />
-            <span className="text-slate-500">re-run sync-vfx-engine.sh</span>
-          </span>
-        ) : (
-          <span className="px-3 text-center text-[10px] leading-tight text-slate-500">
-            no preview
-            <br />
-            (unknown effect)
-          </span>
+    <div className="mt-1 space-y-1">
+      <div className="flex items-center gap-2">
+        <div
+          className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-slate-700"
+          style={{ width: FRAME_SIZE, height: FRAME_SIZE, ...CHECKER_BACKGROUND }}
+        >
+          {hasPreview ? (
+            <canvas ref={canvasRef} width={FRAME_SIZE} height={FRAME_SIZE} className="block" />
+          ) : sheetFailed ? (
+            <span className="px-2 text-center text-[10px] leading-tight text-amber-500/90">
+              sheet image
+              <br />
+              failed to load
+              <br />
+              <span className="text-slate-500">re-run sync-vfx-engine.sh</span>
+            </span>
+          ) : (
+            <span className="px-3 text-center text-[10px] leading-tight text-slate-500">
+              no preview
+              <br />
+              (unknown effect)
+            </span>
+          )}
+        </div>
+        {hasPreview && (
+          <button
+            type="button"
+            onClick={() => setPlaying((p) => !p)}
+            className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:border-slate-500 hover:bg-slate-800/60"
+            title={playing ? "Pause preview" : "Play preview"}
+          >
+            {playing ? "⏸" : "▶"}
+          </button>
         )}
       </div>
-      {hasPreview && (
-        <button
-          type="button"
-          onClick={() => setPlaying((p) => !p)}
-          className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:border-slate-500 hover:bg-slate-800/60"
-          title={playing ? "Pause preview" : "Play preview"}
-        >
-          {playing ? "⏸" : "▶"}
-        </button>
+      {def && (
+        <p className="text-[10px] leading-tight text-slate-500">
+          grey figure = stand-in for scale, not final art
+        </p>
       )}
     </div>
   );
