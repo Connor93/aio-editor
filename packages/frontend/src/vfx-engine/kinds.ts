@@ -621,6 +621,14 @@ function drawRain(
 
 // 2-3 zigzag polylines radiating from the center, lightning-like, with
 // deterministic per-segment jitter and an alpha flicker driven by progress.
+//
+// Task 8 (44px survey): at the original lineWidth of 2, the stroke reduces
+// to ~0.69px at INTERNAL_SIZE (2 * 44/128) — thin enough that
+// quantizeToRamp's coverage*luminance cutoff dropped most of the path on
+// every non-tail frame (measured: dark hit literally 0 painted pixels at
+// frame 2/4, every other element sat well under the 20px break-up floor).
+// Thickened to 3.5 (internal ~1.2px, comfortably above one raster pixel)
+// with no other geometry changed; extent re-verified below.
 function drawChains(
   ctx: CanvasRenderingContext2D,
   progress: number,
@@ -630,12 +638,14 @@ function drawChains(
 ): void {
   const chainCount = 3;
   const segments = 5;
-  // Length and jag shrink together to keep the zigzag's amplitude-to-reach
-  // ratio: 40 * 1.5 + jag + lineWidth/2 = 61.9px extent at -lg.
+  // Length unchanged; extent's binding term is length + lineWidth/2 (the jag
+  // offset lands on the OTHER axis at the worst-case angle, not stacking):
+  // measured (instrumented context, not hand arithmetic) 61.75px at -lg,
+  // under the 62px budget. Was 61.00px before this task's lineWidth bump.
   const length = 40 * def.sizeScale * Math.min(1, progress * 1.5);
 
   ctx.strokeStyle = base(def);
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3.5;
 
   for (let c = 0; c < chainCount; c++) {
     const baseAngle = (c / chainCount) * Math.PI * 2 + c * 1.7;
@@ -687,8 +697,17 @@ function drawOrbit(
   }
 }
 
-// Manga-style speed lines radiating straight out from the center, N=16,
-// length pulsing (a quick snap-out) with progress.
+// Manga-style speed lines radiating straight out from the center, length
+// pulsing (a quick snap-out) with progress.
+//
+// Task 8 (44px survey): at the original lineWidth of 1.5 (internal
+// ~0.52px), full-length/low-alpha frames (the length peaks right as alpha
+// is already fading, around frame 2/4) collapsed to LITERALLY ZERO painted
+// pixels for several elements (fire/water/earth/dark all measured 0 at
+// sizeScale 1.5). Fixed by thickening to 3.5 (internal ~1.2px) AND cutting
+// the line count from 16 to 12 — fewer, fatter speed-lines per the brief's
+// stated fix pattern, which also reduces how much adjacent thin lines were
+// visually merging into a single blur at 44px. No length/inner change.
 function drawBurstLines(
   ctx: CanvasRenderingContext2D,
   progress: number,
@@ -696,15 +715,16 @@ function drawBurstLines(
   cx: number,
   cy: number,
 ): void {
-  const count = 16;
-  // Lines start at `inner` and run out to inner + maxLen, so the two stack:
-  // (4 + 36) * 1.5 + lineWidth/2 = 60.75px extent at -lg.
+  const count = 12;
+  // Lines start at `inner` and run out to inner + maxLen, so the two stack;
+  // lineWidth is the only term this task changed. Measured (instrumented
+  // context) 61.75px at -lg, under the 62px budget — was 60.75px before.
   const maxLen = 36 * def.sizeScale;
   const inner = 4 * def.sizeScale;
   const lenFactor = Math.sin(Math.min(progress * 1.6, 1) * Math.PI * 0.5);
 
   ctx.strokeStyle = base(def);
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 3.5;
   ctx.globalAlpha = 1 - progress;
 
   for (let i = 0; i < count; i++) {
