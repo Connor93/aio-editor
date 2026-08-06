@@ -13,7 +13,7 @@ import {
   type VfxDef,
 } from "../../vfx-engine";
 
-/** `buildRegistry()` allocates all ~379 defs on every call — build it once
+/** `buildRegistry()` allocates all 407 defs on every call — build it once
  *  at module scope (module singletons only re-evaluate on a hard reload)
  *  instead of inside the component, an effect, or the rAF loop. */
 const VFX_REGISTRY: Record<string, VfxDef> = buildRegistry();
@@ -224,7 +224,7 @@ export function VfxPreview({ value }: { value: string }) {
   const hasPreview = Boolean((sheet && !sheetFailed) || def);
 
   // The box a procedural def paints into grows with `def.frame` — a tall
-  // def (Task 4) is 132x264, twice the height of the square 132x132 box
+  // def (Task 1) is 132x264, twice the height of the square 132x132 box
   // every def used before it. Sheets are always square (see sheets.ts) and
   // the "no preview"/"sheet failed" fallback text has no frame at all, so
   // both fall back to the global FRAME_SIZE, matching today's fixed box

@@ -1431,10 +1431,7 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
   // generated set-piece defs (matrix/combo generation, the only place that
   // reads a kind's own timing off KINDS, deliberately skips them; see
   // MATRIX_KINDS). They're populated anyway only because KindConfig requires
-  // them. `front` throws rather than being omitted so the vfx-registry-check
-  // script's "every kind's draw.front is a function" assertion — the runtime
-  // proof that TS's non-optional `front` is actually satisfied — still holds;
-  // the check script only ever inspects `typeof`, never calls the function.
+  // them.
   bolt: {
     ...IMPACT_TIMING,
     draw: { behind: drawBoltBehind, tint: drawBoltTint, front: drawBoltFront },

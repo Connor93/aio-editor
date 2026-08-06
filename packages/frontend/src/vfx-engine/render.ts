@@ -106,8 +106,10 @@ function rasterizeLayer(
 
   // 1. Rasterise at the frame's internal resolution. Draw functions keep
   //    writing in the DESIGN_SIZE-wide space and ctx.scale does the
-  //    reduction — their geometry constants are tuned to that space
-  //    (Chebyshev extent <= 62px at sizeScale 1.5) and must NOT be rewritten.
+  //    reduction — their geometry constants are tuned to a per-frame extent
+  //    budget (SQUARE_FRAME: Chebyshev extent <= 62px at sizeScale 1.5;
+  //    TALL_FRAME: asymmetric — see TALL_FRAME's doc comment in types.ts)
+  //    and must NOT be rewritten.
   const small = document.createElement('canvas');
   small.width = f.internalW;
   small.height = f.internalH;

@@ -63,11 +63,13 @@ export interface VfxDef {
 //                 resolution is done with ctx.scale, not by touching draw
 //                 functions.
 //
-//   INTERNAL_SIZE the actual raster resolution: draw functions are rendered
-//                 into an INTERNAL_SIZE square (via ctx.scale(INTERNAL_SIZE /
-//                 DESIGN_SIZE)) and quantised onto the ramp AT this
-//                 resolution, so each ramp band lands on whole pixels before
-//                 any upscaling happens.
+//   INTERNAL_SIZE the raster scale factor: draw functions are rendered via
+//                 ctx.scale(INTERNAL_SIZE / DESIGN_SIZE) into a box sized to
+//                 the def's own frame geometry — INTERNAL_SIZE square for
+//                 SQUARE_FRAME, INTERNAL_SIZE wide by taller for TALL_FRAME
+//                 (see FrameGeometry below) — and quantised onto the ramp AT
+//                 this resolution, so each ramp band lands on whole pixels
+//                 before any upscaling happens.
 //
 //   PIXEL_SCALE   the integer factor the internal raster is upscaled by
 //                 (nearest-neighbour, imageSmoothingEnabled = false) to reach
@@ -98,11 +100,11 @@ export const FRAME_SIZE = INTERNAL_SIZE * PIXEL_SCALE;
  *  box, and the derived raster/output sizes.
  *
  *  `designW`/`designH` are the coordinate space draw functions write in —
- *  DESIGN_SIZE stays the WIDTH unit, and a tall frame only grows downward-to-
- *  upward headroom. `groundY` is what draw functions receive as `cy`: the
- *  point that lines up with the target's feet. For a square frame that is the
- *  centre (unchanged); for a tall frame it sits three-quarters down, so the
- *  extra height is all headroom ABOVE the target for something to fall from. */
+ *  DESIGN_SIZE stays the WIDTH unit; only HEIGHT grows for a tall frame.
+ *  `groundY` is what draw functions receive as `cy`: the point that lines up
+ *  with the target's feet. For a square frame that is the centre
+ *  (unchanged); for a tall frame it sits three-quarters down, so the extra
+ *  height is all headroom ABOVE the target for something to fall from. */
 export interface FrameGeometry {
   designW: number;
   designH: number;
@@ -144,5 +146,15 @@ export const SQUARE_FRAME: FrameGeometry = makeFrame(128, 128, 64);
 
 /** Descents. 128x256 design -> 44x88 raster -> 132x264 output. The ground
  *  point is at y=192, so the bottom 128 design-px occupy exactly where a
- *  square frame would sit and the top 128 are headroom. anchorY = 0.75. */
+ *  square frame would sit and the top 128 are headroom. anchorY = 0.75.
+ *
+ *  Extent budget for draw functions here is ASYMMETRIC, unlike
+ *  SQUARE_FRAME's uniform "Chebyshev extent <= 62px at sizeScale 1.5" (see
+ *  kinds.ts's frame-budget header). Re-derived from designH=256 and
+ *  groundY=192 — from the ground point (cx, cy) a draw function receives:
+ *    horizontal from cx:          +/-64 available -> budget <= 62 (same as SQUARE_FRAME)
+ *    above cy (headroom):          192 available -> budget <= 190
+ *    below cy (past the target):    64 available -> budget <= 62
+ *  See kinds.ts's "Set pieces" header for the per-kind draw functions tuned
+ *  to this budget. */
 export const TALL_FRAME: FrameGeometry = makeFrame(128, 256, 192);
