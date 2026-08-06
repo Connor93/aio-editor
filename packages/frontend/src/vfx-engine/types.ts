@@ -19,7 +19,16 @@ export type ShapeKind =
   | 'rain'
   | 'chains'
   | 'orbit'
-  | 'burst-lines';
+  | 'burst-lines'
+  // Set pieces (registry.ts's `setpiece` layer): element-only, size-less.
+  // Live in the same KINDS table as the 15 above — their draw functions are
+  // ordinary draw functions — but MUST NOT be added to MATRIX_KINDS in
+  // registry.ts, or each one would silently gain 21 matrix names (7
+  // elements x 3 sizes) it was never meant to have.
+  | 'bolt'
+  | 'smite'
+  | 'rockfall'
+  | 'ring-of-fire';
 
 // The three depth passes an effect can paint into, relative to the
 // character sprite: 'behind' composites under them, 'tint' blends onto them

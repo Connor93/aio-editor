@@ -1,14 +1,44 @@
 // SYNCED FROM eoweb src/vfx-engine — DO NOT EDIT HERE. Regenerate: eoweb/scripts/sync-vfx-engine.sh
-// The generative palette: builds the full name -> VfxDef map from three
+// The generative palette: builds the full name -> VfxDef map from four
 // layers — a kind x element x size matrix, a curated set of two-kind combos,
-// and a handful of fixed "special" effects with hand-tuned params.
+// a handful of fixed "special" effects with hand-tuned params, and a set of
+// element-parameterised, size-less "set piece" effects (bolt, smite,
+// rockfall, ring-of-fire).
 
 import { KINDS } from './kinds';
 import { ELEMENTS, type ElementKey, type Ramp } from './palette';
-import { type ShapeKind, SQUARE_FRAME, type VfxDef } from './types';
+import {
+  type FrameGeometry,
+  type ShapeKind,
+  SQUARE_FRAME,
+  TALL_FRAME,
+  type VfxDef,
+} from './types';
 
-export type VfxLayer = 'matrix' | 'combo' | 'special';
+export type VfxLayer = 'matrix' | 'combo' | 'special' | 'setpiece';
 export type SizeKey = 'sm' | 'base' | 'lg';
+
+/** The kinds that participate in the kind x element x size matrix. Set pieces
+ *  live in KINDS too (their draw functions are ordinary draw functions) but
+ *  are DELIBERATELY excluded here — they are element-only and size-less, so
+ *  iterating Object.keys(KINDS) would silently give each one 21 matrix names. */
+const MATRIX_KINDS: readonly ShapeKind[] = [
+  'ring',
+  'disc',
+  'spark-burst',
+  'slash',
+  'spiral',
+  'sparkle',
+  'nova',
+  'shockwave',
+  'beam-pop',
+  'implode',
+  'vortex',
+  'rain',
+  'chains',
+  'orbit',
+  'burst-lines',
+];
 
 // [UI key, NAME SUFFIX, sizeScale]. The suffix is '' at base size — the
 // generated name is `nova-fire`, never `nova-fire-base`. Keep these distinct:
@@ -32,6 +62,27 @@ const COMBOS: ReadonlyArray<readonly [ShapeKind, ShapeKind]> = [
   ['nova', 'burst-lines'],
   ['orbit', 'sparkle'],
 ];
+
+type SetPieceName = 'bolt' | 'smite' | 'rockfall' | 'ring-of-fire';
+
+interface SetPieceConfig {
+  frame: FrameGeometry;
+  frames: number;
+  loops: number;
+  frameMs: number;
+}
+
+/** Element-parameterised, size-less. Descents are FAST (400ms) on purpose:
+ *  skills have no cast time, so damage and impact_vfx resolve together and a
+ *  slow descent would land its impact after the damage number had already
+ *  popped. `ring-of-fire` is a sustained ground effect, so it keeps the square
+ *  frame and loops. */
+const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
+  bolt: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
+  smite: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
+  rockfall: { frame: TALL_FRAME, frames: 4, loops: 1, frameMs: 100 },
+  'ring-of-fire': { frame: SQUARE_FRAME, frames: 4, loops: 3, frameMs: 100 },
+};
 
 // Keys mirror SPECIALS below. A literal union (not `Record<string, Ramp>`)
 // so `SPECIAL_RAMPS['heal-glow']` types as `Ramp`, never `Ramp | undefined`
@@ -176,8 +227,9 @@ export function buildRegistry(): Record<string, VfxDef> {
   // prototype key — misses cleanly and degrades to "no effect".
   const registry: Record<string, VfxDef> = Object.create(null);
 
-  // Matrix: every kind x every element x every size.
-  for (const kind of Object.keys(KINDS) as ShapeKind[]) {
+  // Matrix: every kind x every element x every size. MATRIX_KINDS, NOT
+  // Object.keys(KINDS) — see MATRIX_KINDS's doc comment above.
+  for (const kind of MATRIX_KINDS) {
     const config = KINDS[kind];
     for (const element of Object.keys(ELEMENTS) as ElementKey[]) {
       for (const [, suffix, sizeScale] of SIZES) {
@@ -220,19 +272,46 @@ export function buildRegistry(): Record<string, VfxDef> {
     registry[name] = def;
   }
 
+  // Set pieces: each x every element, base size only.
+  for (const [name, cfg] of Object.entries(SET_PIECES) as [
+    SetPieceName,
+    SetPieceConfig,
+  ][]) {
+    for (const element of Object.keys(ELEMENTS) as ElementKey[]) {
+      registry[`${name}-${element}`] = {
+        kind: name,
+        ramp: ELEMENTS[element],
+        sizeScale: 1,
+        additive: true,
+        frames: cfg.frames,
+        loops: cfg.loops,
+        frameMs: cfg.frameMs,
+        frame: cfg.frame,
+      };
+    }
+  }
+
   return registry;
 }
 
-// Membership sets, NOT `key in obj`. KINDS/ELEMENTS/SPECIALS are plain object
-// literals, so `'constructor' in ELEMENTS` is true and would let a prototype
-// key compose a bogus name. (Object.hasOwn is unavailable — tsconfig is ES2020.)
-const KIND_KEYS: ReadonlySet<string> = new Set(Object.keys(KINDS));
+// Membership sets, NOT `key in obj`. KINDS/ELEMENTS/SPECIALS/SET_PIECES are
+// plain object literals, so `'constructor' in ELEMENTS` is true and would let
+// a prototype key compose a bogus name. (Object.hasOwn is unavailable —
+// tsconfig is ES2020.)
+//
+// KIND_KEYS is built from MATRIX_KINDS, NOT Object.keys(KINDS) — KINDS also
+// contains the 4 set-piece kinds, and validating the `kind:` shapeId prefix
+// against the full set would let composeVfxName('kind:bolt', 'fire', 'lg')
+// compose `bolt-fire-lg`, a name buildRegistry() never generates.
+const KIND_KEYS: ReadonlySet<string> = new Set(MATRIX_KINDS);
 const ELEMENT_KEYS: ReadonlySet<string> = new Set(Object.keys(ELEMENTS));
 const SPECIAL_KEYS: ReadonlySet<string> = new Set(Object.keys(SPECIALS));
+const SET_PIECE_KEYS: ReadonlySet<string> = new Set(Object.keys(SET_PIECES));
 
 const KIND_PREFIX = 'kind:';
 const COMBO_PREFIX = 'combo:';
 const SPECIAL_PREFIX = 'special:';
+const SETPIECE_PREFIX = 'setpiece:';
 
 function kindShapeId(kind: ShapeKind): string {
   return `${KIND_PREFIX}${kind}`;
@@ -242,6 +321,9 @@ function comboShapeId(a: ShapeKind, b: ShapeKind): string {
 }
 function specialShapeId(name: string): string {
   return `${SPECIAL_PREFIX}${name}`;
+}
+function setPieceShapeId(name: SetPieceName): string {
+  return `${SETPIECE_PREFIX}${name}`;
 }
 
 /** 'spark-burst' -> 'Spark Burst'. Used for picker labels only. */
@@ -277,7 +359,7 @@ export interface VfxShape {
 export function buildIndex(): Record<string, VfxAxes> {
   const index: Record<string, VfxAxes> = Object.create(null);
 
-  for (const kind of Object.keys(KINDS) as ShapeKind[]) {
+  for (const kind of MATRIX_KINDS) {
     for (const element of Object.keys(ELEMENTS) as ElementKey[]) {
       for (const [sizeKey, suffix] of SIZES) {
         const name = `${kind}-${element}${suffix ? `-${suffix}` : ''}`;
@@ -312,15 +394,26 @@ export function buildIndex(): Record<string, VfxAxes> {
     };
   }
 
+  for (const name of Object.keys(SET_PIECES) as SetPieceName[]) {
+    for (const element of Object.keys(ELEMENTS) as ElementKey[]) {
+      index[`${name}-${element}`] = {
+        layer: 'setpiece',
+        kind: name,
+        element,
+        shapeId: setPieceShapeId(name),
+      };
+    }
+  }
+
   return index;
 }
 
-/** One entry per selectable Shape, in display order: kinds, then combos, then
- *  specials. 15 + 8 + 8 = 31. */
+/** One entry per selectable Shape, in display order: kinds, then combos,
+ *  specials, then set pieces. 15 + 8 + 8 + 4 = 35. */
 export function buildShapes(): VfxShape[] {
   const shapes: VfxShape[] = [];
 
-  for (const kind of Object.keys(KINDS) as ShapeKind[]) {
+  for (const kind of MATRIX_KINDS) {
     shapes.push({
       id: kindShapeId(kind),
       label: titleCase(kind),
@@ -352,6 +445,16 @@ export function buildShapes(): VfxShape[] {
     });
   }
 
+  for (const name of Object.keys(SET_PIECES) as SetPieceName[]) {
+    shapes.push({
+      id: setPieceShapeId(name),
+      label: titleCase(name),
+      layer: 'setpiece',
+      hasElement: true,
+      hasSize: false,
+    });
+  }
+
   return shapes;
 }
 
@@ -365,6 +468,15 @@ export function composeVfxName(
   if (shapeId.startsWith(SPECIAL_PREFIX)) {
     const name = shapeId.slice(SPECIAL_PREFIX.length);
     return SPECIAL_KEYS.has(name) ? name : null;
+  }
+
+  if (shapeId.startsWith(SETPIECE_PREFIX)) {
+    const name = shapeId.slice(SETPIECE_PREFIX.length);
+    if (!SET_PIECE_KEYS.has(name)) return null;
+    if (!element || !ELEMENT_KEYS.has(element)) return null;
+    // `size` is deliberately ignored — set pieces are size-less, exactly as
+    // the combo branch below ignores it.
+    return `${name}-${element}`;
   }
 
   if (shapeId.startsWith(COMBO_PREFIX)) {

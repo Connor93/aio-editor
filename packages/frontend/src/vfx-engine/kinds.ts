@@ -785,4 +785,47 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
   chains: { ...FLOW_TIMING, draw: { front: drawChains } },
   rain: { ...FLOW_TIMING, draw: { front: drawRain } },
   'beam-pop': { ...FLOW_TIMING, draw: { front: drawBeamPop } },
+
+  // Set pieces (Task 4 plumbing; Tasks 5/6 supply real art). `frames`/
+  // `loops`/`frameMs`/`additive` here are never read for these four kinds —
+  // registry.ts's SET_PIECES table carries the authoritative cadence for
+  // generated set-piece defs (matrix/combo generation, the only place that
+  // reads a kind's own timing off KINDS, deliberately skips them; see
+  // MATRIX_KINDS). They're populated anyway only because KindConfig requires
+  // them. `front` throws rather than being omitted so the vfx-registry-check
+  // script's "every kind's draw.front is a function" assertion — the runtime
+  // proof that TS's non-optional `front` is actually satisfied — still holds;
+  // the check script only ever inspects `typeof`, never calls the function.
+  bolt: {
+    ...IMPACT_TIMING,
+    draw: {
+      front: () => {
+        throw new Error('unimplemented: bolt');
+      },
+    },
+  },
+  smite: {
+    ...IMPACT_TIMING,
+    draw: {
+      front: () => {
+        throw new Error('unimplemented: smite');
+      },
+    },
+  },
+  rockfall: {
+    ...IMPACT_TIMING,
+    draw: {
+      front: () => {
+        throw new Error('unimplemented: rockfall');
+      },
+    },
+  },
+  'ring-of-fire': {
+    ...FLOW_TIMING,
+    draw: {
+      front: () => {
+        throw new Error('unimplemented: ring-of-fire');
+      },
+    },
+  },
 };
