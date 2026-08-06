@@ -1041,26 +1041,35 @@ function drawSmiteTint(
 //
 // Each rock has its own [topOffset, landProgress, fallDuration] profile
 // (ROCKFALL_PROFILE), NOT one shared closed form — a hand-tuned table, not
-// indexFrac jitter, because these three numbers are load-bearing for a hard
-// requirement: EVERY sampled frame must paint something in BOTH `behind` and
-// `front` (verified by the Task 6 extent script). A naive shared schedule
-// where all 3 rocks start above the cutoff and all 3 land by frame 3 fails
-// this on both ends — frame 0 (nothing has fallen far enough to cross into
-// `front` yet) and frame 3 (everything has already landed, so nothing is
-// left in `behind`) both come up empty. The fix:
+// indexFrac jitter, staggered so the three rocks read as separate falls
+// rather than one synchronized drop:
 //   rock 0 — short/close (topOffset 70): already mid-fall and BELOW the
 //     `behind` cutoff on frame 0, landing on frame 1. Guarantees `front`
 //     content from frame 0 onward.
 //   rock 1 — full height (topOffset 150): lands on frame 2, the "middle"
 //     rock, crossing from `behind` to `front` partway through.
-//   rock 2 — full height (topOffset 150), but with a landProgress (1.5)
-//     PAST the sampled range [0.125, 0.875]: it is still audibly mid-fall
-//     on frame 3 and never touches down on screen. Guarantees `behind`
-//     content on every frame, including the last, where rocks 0 and 1 have
-//     both already landed and moved to `front`. Its fall is smooth and
-//     continuous across all 4 samples (137.5 -> 112.5 -> 87.5 -> 62.5, an
-//     even 25px/frame), which also makes it the effect's clearest single
-//     "reads as travel" case.
+//   rock 2 — full height (topOffset 150), landing LAST, on frame 3
+//     (landProgress 0.875, the final sampled progress value). It stays put
+//     through frame 0 (its fallDuration-0.5 window doesn't open until
+//     progress 0.375), then descends smoothly across the remaining three
+//     samples — 150 -> 150 -> 75 -> 0 — landing exactly on the last frame,
+//     the same "reads as travel, not a jump" shape as rocks 0 and 1.
+//
+// An earlier version pinned rock 2's landProgress past the sampled range
+// entirely (1.5, with a matching 1.5 fallDuration) specifically so it would
+// NEVER land on screen — the reasoning at the time was that a `behind`-empty
+// frame at the end of the clip would read as a stutter. That reasoning was
+// wrong, and over-general: it treated ANY empty layer-frame as a defect,
+// when in fact once all three rocks have landed there genuinely IS nothing
+// left behind the character to draw. An empty `behind` layer on frame 3,
+// sitting alongside a populated `front` layer (three landed rocks plus
+// their impact puffs), is the CORRECT steady state for that moment, not a
+// bug — keeping rock 2 permanently airborne to dodge it just bought a rock
+// that visibly never finishes falling, in exchange for avoiding a non-
+// problem. (There was never a committed assertion enforcing "every frame
+// paints something in every layer" to relax here, either — that check only
+// ever lived in throwaway per-task verification scripts, not in the repo.)
+//
 // Horizontal position is still index-derived (rockHOffset) and every rock's
 // silhouette/streak jitter is index-derived (drawRockShape) — only these
 // three timing numbers per rock are a fixed table.
@@ -1072,12 +1081,12 @@ const ROCKFALL_BEHIND_CUTOFF = 40; // rocks above cy - this draw in `behind`, at
 // [topOffset, landProgress, fallDuration] per rock — see the module comment
 // above for why these specific numbers, not indexFrac jitter.
 const ROCKFALL_TOP_OFFSET: readonly number[] = [70, 150, 150];
-const ROCKFALL_LAND_PROGRESS: readonly number[] = [0.375, 0.625, 1.5];
-const ROCKFALL_FALL_DURATION: readonly number[] = [0.5, 0.5, 1.5];
+const ROCKFALL_LAND_PROGRESS: readonly number[] = [0.375, 0.625, 0.875];
+const ROCKFALL_FALL_DURATION: readonly number[] = [0.5, 0.5, 0.5];
 
-// Rock i's landing progress — 0.375/0.625 for rocks 0/1 (frames 1/2); rock
-// 2's "landing" (1.5) is past the sampled range and never actually occurs
-// on screen (see the module comment above).
+// Rock i's landing progress — 0.375/0.625/0.875 for rocks 0/1/2, i.e. frames
+// 1/2/3 respectively (see the module comment above for why rock 2 lands
+// last, on the final sampled frame, instead of never landing at all).
 function rockLandProgress(i: number): number {
   return ROCKFALL_LAND_PROGRESS[i] as number;
 }
@@ -1231,11 +1240,14 @@ function drawRockfallTint(
   cx: number,
   cy: number,
 ): void {
-  // A brief flash on the frame each rock lands. Landing progress values are
-  // 0.375/0.625 (rocks 0/1 — rockLandProgress; rock 2 never lands on
-  // screen, see the module comment above drawRockShape), i.e. frames 1-2
-  // only — same 0.25 < progress < 0.75 gate as drawBoltTint. No draw call
-  // at all when off, same convention as drawShockwaveTint/drawBoltTint.
+  // A brief flash on the frame a rock lands, gated to the middle of the
+  // clip like drawBoltTint (0.25 < progress < 0.75, i.e. frames 1-2 only).
+  // Rocks 0/1 land inside that window (0.375/0.625 — rockLandProgress) and
+  // get the flash. Rock 2 now lands too (frame 3, progress 0.875 — see the
+  // module comment above drawRockShape) but that's past this gate, so its
+  // landing gets no tint flash — it still gets its own impact puff in
+  // drawRockfallFront, which isn't gated the same way. No draw call at all
+  // when off, same convention as drawShockwaveTint/drawBoltTint.
   if (progress <= 0.25 || progress >= 0.75) return;
   ctx.globalAlpha = 1;
   ctx.fillStyle = rung(def, RAMP_BASE + 1);
