@@ -20,6 +20,15 @@ const VFX_REGISTRY: Record<string, VfxDef> = buildRegistry();
  *  to re-decode every time the author clicks a different shape. */
 const SHEET_IMAGES = new Map<string, HTMLImageElement>();
 
+/** Sheet files whose image failed to load (missing PNG, 404, decode error).
+ *  Module-scoped so a known-bad file is recognised immediately on every later
+ *  mount — critical, because a failed `HTMLImageElement` reports
+ *  `complete === true` with `naturalWidth === 0` forever after, and its `error`
+ *  event already fired once and will never fire again. Without this, a second
+ *  mount would take neither the ready path nor the listener path and sit on a
+ *  blank canvas indefinitely. */
+const SHEET_LOAD_FAILED = new Set<string>();
+
 /** Resolves (and on first use, starts loading) the decoded image for a sheet.
  *  The PNGs are vendored into `public/vfx/` by eoweb's sync-vfx-engine.sh, so
  *  they're served from this app's own origin at `/vfx/<file>`. */
@@ -64,10 +73,15 @@ export function VfxPreview({ value }: { value: string }) {
    *  frame and must not re-render the component to do so. */
   const progressRef = useRef(0);
 
+  /** Bumped when a sheet image fails, so the failure (recorded in a module-level
+   *  Set, not in state) re-renders this component into its fallback. */
+  const [, bumpLoadFailure] = useState(0);
+
   // Sheets are NOT in the generated registry, so they must be resolved first.
   const sheet: SheetDef | undefined = getSheetDef(value);
   const def: VfxDef | undefined = sheet ? undefined : VFX_REGISTRY[value];
-  const hasPreview = Boolean(sheet || def);
+  const sheetFailed = sheet ? SHEET_LOAD_FAILED.has(sheet.file) : false;
+  const hasPreview = Boolean((sheet && !sheetFailed) || def);
 
   // --- Procedural (vfx-engine registry) ---
   useEffect(() => {
@@ -105,7 +119,7 @@ export function VfxPreview({ value }: { value: string }) {
 
   // --- Sprite sheet ---
   useEffect(() => {
-    if (!sheet) return;
+    if (!sheet || SHEET_LOAD_FAILED.has(sheet.file)) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -157,15 +171,30 @@ export function VfxPreview({ value }: { value: string }) {
       rafId = requestAnimationFrame(tick);
     };
 
-    if (img.complete && img.naturalWidth > 0) {
-      begin();
+    const markFailed = () => {
+      if (cancelled) return;
+      SHEET_LOAD_FAILED.add(sheet.file);
+      // Re-render so `hasPreview` goes false and the muted fallback replaces
+      // the canvas — otherwise the user stares at an empty box with a live
+      // ▶/⏸ button and no clue anything went wrong.
+      bumpLoadFailure((n) => n + 1);
+    };
+
+    if (img.complete) {
+      // `complete` is also true for an image that already FAILED, and in that
+      // case its `error` event fired long ago and will never fire again — so
+      // this must branch on naturalWidth, not just complete.
+      if (img.naturalWidth > 0) begin();
+      else markFailed();
     } else {
       img.addEventListener("load", begin, { once: true });
+      img.addEventListener("error", markFailed, { once: true });
     }
 
     return () => {
       cancelled = true;
       img.removeEventListener("load", begin);
+      img.removeEventListener("error", markFailed);
       cancelAnimationFrame(rafId);
     };
   }, [sheet, playing]);
@@ -178,6 +207,14 @@ export function VfxPreview({ value }: { value: string }) {
       >
         {hasPreview ? (
           <canvas ref={canvasRef} width={FRAME_SIZE} height={FRAME_SIZE} className="block" />
+        ) : sheetFailed ? (
+          <span className="px-2 text-center text-[10px] leading-tight text-amber-500/90">
+            sheet image
+            <br />
+            failed to load
+            <br />
+            <span className="text-slate-500">re-run sync-vfx-engine.sh</span>
+          </span>
         ) : (
           <span className="px-3 text-center text-[10px] leading-tight text-slate-500">
             no preview
