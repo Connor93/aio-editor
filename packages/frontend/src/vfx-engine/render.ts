@@ -13,6 +13,22 @@ import { KINDS } from './kinds';
 import type { Ramp } from './palette';
 import { DESIGN_SIZE, FRAME_SIZE, INTERNAL_SIZE, type VfxDef } from './types';
 
+/** Total playback time: one cycle of `frames`, repeated `loops` times. */
+export function effectDurationMs(def: VfxDef): number {
+  return def.frames * def.loops * def.frameMs;
+}
+
+/** Progress to draw for a given ABSOLUTE frame index (0 .. frames*loops-1).
+ *  Sampled at the frame's MIDPOINT so a 4-frame cycle yields four evenly
+ *  spaced distinct states instead of always starting at zero — at progress 0
+ *  seven of the fifteen kinds are geometrically degenerate (zero radius /
+ *  length / height) and would render blank. The index wraps within the cycle,
+ *  which is what makes loops repeat rather than continue expanding. */
+export function frameProgress(def: VfxDef, frameIndex: number): number {
+  const f = ((frameIndex % def.frames) + def.frames) % def.frames;
+  return (f + 0.5) / def.frames;
+}
+
 /** Snap every painted pixel onto the def's 4-rung ramp, using its own perceived
  *  brightness weighted by coverage as the index, and write it at full alpha.
  *  Hard steps, no dither: a screen-space dither pattern shimmers when the shape
@@ -52,6 +68,11 @@ function quantizeToRamp(
   ctx.putImageData(img, 0, 0);
 }
 
+/** Rasterises ONE frame of ONE cycle. `frameIndex` must be in
+ *  `[0, def.frames)` — looping (`def.loops`) is a playback-side concern, not
+ *  a rasterisation one: the caller reuses these same `def.frames` textures
+ *  for every repeat of the cycle rather than this function producing
+ *  `frames * loops` distinct images. */
 export function renderFrameCanvas(
   def: VfxDef,
   frameIndex: number,
@@ -72,10 +93,7 @@ export function renderFrameCanvas(
   sctx.save();
   sctx.scale(k, k);
   sctx.globalCompositeOperation = def.additive ? 'lighter' : 'source-over';
-  // Keep the EXISTING progress formula here — Task 3 replaces it with
-  // midpoint sampling. Do not forward-reference frameProgress(); it does not
-  // exist yet at this point in the plan.
-  const progress = frameIndex / def.frames;
+  const progress = frameProgress(def, frameIndex);
   KINDS[def.kind].draw(sctx, progress, def, DESIGN_SIZE / 2, DESIGN_SIZE / 2);
   if (def.combo) {
     KINDS[def.combo].draw(

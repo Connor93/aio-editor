@@ -25,9 +25,10 @@ export interface VfxDef {
   kind: ShapeKind;
   ramp: Ramp; // shadow/mid/base/hot — was: color: number
   sizeScale: number; // 0.6 sm / 1.0 base / 1.5 lg
-  durationMs: number;
   additive: boolean;
-  frames: number; // discrete frames eoweb rasterizes (e.g. 12)
+  frames: number; // discrete frames in ONE cycle (default 4)
+  loops: number; // cycle repeats (per-effect; EO spans 1-8)
+  frameMs: number; // hold time per frame, ms (default 100)
   combo?: ShapeKind; // optional second kind composited on top
 }
 

@@ -45,8 +45,9 @@ import { RAMP_BASE } from './palette';
 import type { ShapeKind, VfxDef } from './types';
 
 export interface KindConfig {
-  durationMs: number;
   frames: number;
+  loops: number;
+  frameMs: number;
   additive: boolean;
   draw(
     ctx: CanvasRenderingContext2D,
@@ -582,10 +583,23 @@ function drawBurstLines(
   }
 }
 
-// Impacts: short, punchy hits.
-const IMPACT_TIMING = { durationMs: 350, frames: 12, additive: true } as const;
-// Sustained/looping-feel effects: a little longer and smoother.
-const FLOW_TIMING = { durationMs: 500, frames: 14, additive: true } as const;
+// Impacts: short, punchy hits. A single 4-frame cycle, no repeat —
+// 4 * 1 * 100ms = 400ms. Looping an impact reads as sluggish (see the
+// module-level cadence note below), so these get the minimum loop count.
+const IMPACT_TIMING = {
+  frames: 4,
+  loops: 1,
+  frameMs: 100,
+  additive: true,
+} as const;
+// Sustained/looping-feel effects: the same 4-frame cycle repeated 3x reads
+// as ongoing magic rather than a one-shot flourish — 4 * 3 * 100ms = 1200ms.
+const FLOW_TIMING = {
+  frames: 4,
+  loops: 3,
+  frameMs: 100,
+  additive: true,
+} as const;
 
 export const KINDS: Record<ShapeKind, KindConfig> = {
   ring: { ...IMPACT_TIMING, draw: drawRing },

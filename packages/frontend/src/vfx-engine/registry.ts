@@ -66,70 +66,95 @@ const SPECIAL_RAMPS: Record<SpecialName, Ramp> = {
 
 // Fixed, hand-tuned effects that don't fit the element matrix (heals,
 // buffs, crits, ...).
+// Cadence: every special inherits its underlying kind's default cadence
+// (impact-role kinds -> IMPACT_TIMING, sustained-role kinds -> FLOW_TIMING —
+// see the grouping in kinds.ts) UNLESS commented otherwise below. Two
+// specials override AGAINST their kind's default role (heal-glow/buff-aura
+// sit on impact-role kinds `disc`/`ring` but read better lingering), and
+// crit-flash is intentionally faster than a stock nova.
 const SPECIALS: Record<string, VfxDef> = {
+  // Overridden to sustained (loops: 3) — `disc` is impact-role by default,
+  // but a heal should read as a lingering glow, not a punchy hit.
   'heal-glow': {
     kind: 'disc',
     ramp: SPECIAL_RAMPS['heal-glow'],
     sizeScale: 1,
-    durationMs: 900,
     additive: true,
-    frames: 18,
+    frames: 4,
+    loops: 3,
+    frameMs: 100,
   },
+  // Overridden to sustained (loops: 3) — `ring` is impact-role by default,
+  // but an aura buff should read as ongoing, not a one-shot flourish.
   'buff-aura': {
     kind: 'ring',
     ramp: SPECIAL_RAMPS['buff-aura'],
     sizeScale: 1,
-    durationMs: 700,
     additive: true,
-    frames: 14,
+    frames: 4,
+    loops: 3,
+    frameMs: 100,
   },
+  // `implode` default (impact-role): 4 * 1 * 100ms = 400ms.
   'debuff-sink': {
     kind: 'implode',
     ramp: SPECIAL_RAMPS['debuff-sink'],
     sizeScale: 1,
-    durationMs: 350,
     additive: true,
-    frames: 12,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
   },
+  // `shockwave` default (impact-role): 4 * 1 * 100ms = 400ms.
   'shield-flash': {
     kind: 'shockwave',
     ramp: SPECIAL_RAMPS['shield-flash'],
     sizeScale: 1,
-    durationMs: 350,
     additive: true,
-    frames: 12,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
   },
+  // `spiral` default (sustained-role): 4 * 3 * 100ms = 1200ms.
   'cast-arcane': {
     kind: 'spiral',
     ramp: SPECIAL_RAMPS['cast-arcane'],
     sizeScale: 1,
-    durationMs: 500,
     additive: true,
-    frames: 14,
+    frames: 4,
+    loops: 3,
+    frameMs: 100,
   },
+  // `beam-pop` default (sustained-role): 4 * 3 * 100ms = 1200ms.
   'level-up': {
     kind: 'beam-pop',
     ramp: SPECIAL_RAMPS['level-up'],
     sizeScale: 1,
-    durationMs: 500,
     additive: true,
-    frames: 14,
+    frames: 4,
+    loops: 3,
+    frameMs: 100,
   },
+  // Overridden: a single fast pop, quicker than a stock nova (frameMs 60
+  // instead of 100) — 4 * 1 * 60ms = 240ms.
   'crit-flash': {
     kind: 'nova',
     ramp: SPECIAL_RAMPS['crit-flash'],
     sizeScale: 1,
-    durationMs: 180,
     additive: true,
-    frames: 8,
+    frames: 4,
+    loops: 1,
+    frameMs: 60,
   },
+  // `orbit` default (sustained-role): 4 * 3 * 100ms = 1200ms.
   'stun-stars': {
     kind: 'orbit',
     ramp: SPECIAL_RAMPS['stun-stars'],
     sizeScale: 1,
-    durationMs: 500,
     additive: true,
-    frames: 14,
+    frames: 4,
+    loops: 3,
+    frameMs: 100,
   },
 };
 
@@ -153,9 +178,10 @@ export function buildRegistry(): Record<string, VfxDef> {
           kind,
           ramp: ELEMENTS[element],
           sizeScale,
-          durationMs: config.durationMs,
           additive: config.additive,
           frames: config.frames,
+          loops: config.loops,
+          frameMs: config.frameMs,
         };
       }
     }
@@ -170,9 +196,10 @@ export function buildRegistry(): Record<string, VfxDef> {
         kind: kindA,
         ramp: ELEMENTS[element],
         sizeScale: 1,
-        durationMs: config.durationMs,
         additive: config.additive,
         frames: config.frames,
+        loops: config.loops,
+        frameMs: config.frameMs,
         combo: kindB,
       };
     }
