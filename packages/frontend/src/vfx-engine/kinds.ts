@@ -5,7 +5,7 @@
 // index instead (e.g. `i * 2.399`). eoweb rasterizes frames to textures
 // while a separate editor animates continuously; both must match.
 //
-// All 21 kinds are implemented here. `ring`, `disc`, `spark-burst` are the
+// All 24 kinds are implemented here. `ring`, `disc`, `spark-burst` are the
 // seed pattern the rest follow: save/restore is handled once by the caller
 // (render.ts) around the whole draw (+ optional combo) call, so individual
 // `draw` functions just set the ctx properties they need — no internal
@@ -1942,8 +1942,10 @@ export const WHIRLWIND_SWAY = 6;
 
 const WHIRLWIND_BASE_HALF_W = 10;
 const WHIRLWIND_BANDS = 9;
-/** Vertical squash of each band's ellipse — an isometric-looking ring. */
-const WHIRLWIND_BAND_FLATTEN = 0.32;
+/** Vertical squash of each band's ellipse — an isometric-looking ring.
+ *  Exported so scripts/vfx-registry-check.ts can derive the top band's
+ *  half-height for the extent guard instead of hardcoding it. */
+export const WHIRLWIND_BAND_FLATTEN = 0.32;
 
 /** Geometry of band `i`, shared by all three layers so they cannot drift.
  *  `f` runs 0 at the ground to 1 at the top. Phase comes from `i` directly,
@@ -2040,13 +2042,25 @@ function drawWhirlwindFront(
   whirlwindBands(ctx, progress, cx, cy, true, rung(def, RAMP_BASE + 1), 1);
 
   // Debris orbiting the funnel. Each mote's angle and height come from its
-  // index arithmetically, so the six stay genuinely spread.
+  // index arithmetically, so the six stay genuinely spread and visibly orbit
+  // frame to frame.
+  //
+  // Angular driver: EXACTLY one turn per cycle (`progress * Math.PI * 2`),
+  // same rule as ring-of-fire's flicker (see the module note at kinds.ts's
+  // "LOOP SEAMLESSNESS" header, ~line 1304) and the band sway one line above
+  // in whirlwindBand. frameProgress only ever samples frame MIDPOINTS
+  // (render.ts) — for `frames: 4` that's 0.125/0.375/0.625/0.875 — so a
+  // `* 4` coefficient here previously aliased to just two angles 180 degrees
+  // apart (0.5pi/1.5pi/0.5pi/1.5pi mod 2pi), and every mote strobed between
+  // two points instead of orbiting. Any new angular driver in this module
+  // should advance by `progress * Math.PI * 2` (or an integer multiple of a
+  // full 2*PI cycle) for the same reason.
   const motes = 6;
   ctx.fillStyle = rung(def, RAMP_BASE + 2);
   for (let i = 0; i < motes; i++) {
     const f = (i * 2 + 1) / (motes * 2);
     const b = whirlwindBand(progress, cx, cy, f * (WHIRLWIND_BANDS - 1));
-    const a = progress * Math.PI * 4 + i * ((Math.PI * 2) / motes);
+    const a = progress * Math.PI * 2 + i * ((Math.PI * 2) / motes);
     ctx.globalAlpha = 0.85;
     ctx.beginPath();
     ctx.arc(
@@ -2229,8 +2243,16 @@ function drawArcaneRainFront(
 const POISON_BUBBLES = 5;
 const POISON_CLOUD_RX = 20;
 const POISON_RISE = 26;
-// Extent: the cloud's rx plus the outermost bubble's offset and radius,
-// 20 + 12 + 3 = 35 of the square frame's <=62 design-px half-budget.
+// Extent: not asserted (poison is deliberately the one set piece with no
+// extent guard — see the module note above). For reference only, the widest
+// layer is drawPoisonBehind's haze, which scales up to
+// POISON_CLOUD_RX * 1.1375 = 22.75 design-px by the last sampled frame
+// (0.7 + progress * 0.5 at progress = 0.875). The front bubbles are an
+// INDEPENDENT offset from cx, not additive with the cloud's rx: the
+// outermost bubble reaches |dx| 15 (the +/-12 spread plus the +/-3 nudge,
+// see poisonBubble) with r <= 2.735 (peakR at POISON_POP_T), i.e. ~17.7 —
+// smaller than the haze. Both are well inside the square frame's <=62
+// design-px half-budget.
 
 /** Fraction of a bubble's own post-stagger span `t` at which it begins to
  *  pop — radius collapses linearly from its swell peak toward 0, reaching 0
@@ -2339,7 +2361,13 @@ function drawPoisonFront(
     const b = poisonBubble(progress, i);
     if (b.r <= 0) continue;
     ctx.globalAlpha = 0.9 * (1 - b.rise * 0.5);
-    ctx.fillStyle = rung(def, RAMP_BASE + (b.rise > 0.6 ? 2 : 1));
+    // RAMP_BASE + 1 ("hot") once a bubble is past the pop threshold's
+    // neighbourhood, RAMP_BASE ("base") before — was `+ (2 : 1)`, but
+    // RAMP_BASE is 2 and the ramp only has 4 rungs (indices 0-3), so
+    // `RAMP_BASE + 2` clamped to the same "hot" rung as `RAMP_BASE + 1`
+    // and the bubble never actually changed colour. This makes the
+    // brighten-before-popping read for real.
+    ctx.fillStyle = rung(def, RAMP_BASE + (b.rise > 0.6 ? 1 : 0));
     ctx.beginPath();
     ctx.arc(cx + b.dx, cy - b.rise * POISON_RISE, b.r, 0, Math.PI * 2);
     ctx.fill();

@@ -455,7 +455,7 @@ export function buildRegistry(): Record<string, VfxDef> {
 // tsconfig is ES2020.)
 //
 // KIND_KEYS is built from MATRIX_KINDS, NOT Object.keys(KINDS) — KINDS also
-// contains the 6 set-piece kinds, and validating the `kind:` shapeId prefix
+// contains the 9 set-piece kinds, and validating the `kind:` shapeId prefix
 // against the full set would let composeVfxName('kind:bolt', 'fire', 'lg')
 // compose `bolt-fire-lg`, a name buildRegistry() never generates.
 const KIND_KEYS: ReadonlySet<string> = new Set(MATRIX_KINDS);
@@ -594,7 +594,7 @@ export function buildIndex(): Record<string, VfxAxes> {
 }
 
 /** One entry per selectable Shape, in display order: kinds, then combos,
- *  specials, then set pieces. 15 + 8 + 8 + 6 = 37. */
+ *  specials, then set pieces. 15 + 8 + 8 + 9 = 40. */
 export function buildShapes(): VfxShape[] {
   const shapes: VfxShape[] = [];
 
