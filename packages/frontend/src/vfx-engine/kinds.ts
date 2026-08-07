@@ -2109,7 +2109,7 @@ const ARCANE_FALL_FRAC = 0.78;
 /** Length of the front layer's motion streak trailing above a falling mote;
  *  stacks on ARCANE_START_ABOVE for the worst-case above-cy extent. Exported
  *  for the same guard as ARCANE_START_ABOVE. */
-export const ARCANE_STREAK_LEN = 3.35;
+export const ARCANE_STREAK_LEN = 6;
 
 /** Where mote `i` is: how far through its fall, or how old its splash is.
  *
@@ -2245,24 +2245,37 @@ function drawArcaneRainFront(
     }
 
     const y = cy - ARCANE_START_ABOVE * (1 - m.fall);
-    // Motion streak behind the mote, so a 4-frame fall reads as travel.
+
+    // Drawn SNAPPED to the internal pixel grid, as whole cells.
+    //
+    // This is the only way to make a detail this small actually render small.
+    // The quantiser (render.ts) promotes ANY pixel with roughly >=12.5%
+    // coverage to FULL alpha, so an anti-aliased sub-pixel shape does not
+    // rasterise faint and tiny — it lights every internal pixel it grazes, at
+    // full opacity. A drop about one internal pixel across, drawn at an
+    // arbitrary sub-pixel position, therefore straddles a 2x2 neighbourhood
+    // and all four cells come out solid: with PIXEL_SCALE 3 that is a 6x6
+    // screen-pixel block. Shrinking it in design space barely helps, because
+    // it still straddles the grid.
+    //
+    // Snapping the column to a cell boundary and filling whole cells gives
+    // exactly one pixel of width, so the drop renders 1 cell wide instead of
+    // 2 — genuinely half the width on screen, and crisp rather than blurred
+    // into a block.
+    const k = def.frame.internalW / def.frame.designW;
+    const cell = 1 / k;
+    const colX = Math.floor(x * k) / k;
+    const headY = Math.floor(y * k) / k;
+    const streakCells = Math.max(1, Math.round(ARCANE_STREAK_LEN * k));
+
+    // Trail above the head, one rung cooler so the head reads as the drop.
     ctx.globalAlpha = 0.7;
-    ctx.strokeStyle = rung(def, RAMP_BASE + 1);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x, y - ARCANE_STREAK_LEN);
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    ctx.fillStyle = rung(def, RAMP_BASE + 1);
+    ctx.fillRect(colX, headY - streakCells * cell, cell, streakCells * cell);
 
     ctx.globalAlpha = 1;
     ctx.fillStyle = rung(def, RAMP_BASE + 2);
-    ctx.beginPath();
-    ctx.moveTo(x, y - 1.7);
-    ctx.lineTo(x + 1.5, y);
-    ctx.lineTo(x, y + 1.7);
-    ctx.lineTo(x - 1.5, y);
-    ctx.closePath();
-    ctx.fill();
+    ctx.fillRect(colX, headY, cell, cell);
   }
   ctx.lineWidth = 1;
   ctx.globalAlpha = 1;
