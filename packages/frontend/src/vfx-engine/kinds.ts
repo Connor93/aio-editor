@@ -13,12 +13,13 @@
 // leak into a combo layer drawn right after). Every coordinate is instead
 // computed directly from `cx`/`cy` via cos/sin offsets.
 //
-// Sanctioned exception: `cleave` (below) saves/translates/rotates internally
-// to mirror and rotate its flurry cycles, and restores before returning —
-// verified not to leak into a combo layer. That is the only reason it exists;
-// do not copy the pattern into a new kind without the same save/restore
-// pairing, and do not "simplify" cleave back to the no-transform convention —
-// its mirrored X depends on it.
+// There is no exception to that today. `cleave` briefly had one — it
+// save/rotate/scale'd to mirror its flurry cycles — but the redraw that turned
+// it from an arc into a straight cut expressed the two diagonals as two
+// ANGLES instead, so the transform went away with the arc. Worth remembering
+// as the general shape of the fix: wanting a mirrored or rotated copy is
+// usually a sign the geometry is being described in the wrong frame, not that
+// the convention needs bending.
 //
 // Corollary of that shared-context convention: a draw function that sets a
 // ctx property to a NON-default value which other kinds don't set for
@@ -1514,11 +1515,25 @@ function drawRingOfFireFront(
 }
 
 // ---- cleave ---------------------------------------------------------------
-// A weighted crescent, NOT a literal blade: at 44x44 internal quantised to
-// four rungs a sword mid-swing resolves to a bright stick, so the weight comes
-// from the leading edge being thicker and hotter than the tail. This is the
-// deliberate difference from the `slash` matrix kind, which is one thin
-// tapered stroke with no mass to it (drawSlash, unchanged).
+// A straight diagonal CUT. Not an arc, and not a literal blade.
+//
+// The first version swept a thick round-capped band along a circle of radius
+// 33, and it read as a fireball bouncing past rather than a sword stroke —
+// correctly, because that is what it was: a fat leading edge travelling a
+// curved track is a ball on a rail however it is coloured, and `lineCap:
+// 'round'` made the head literally circular. The taper worked against it too,
+// putting the widest point at the leading end.
+//
+// So the shape is now a filled LENS: pointed at both tips, thickest at the
+// middle, lying on a straight diagonal. Filling a pointed path is what kills
+// the round cap, and the round cap is where "ball" came from. It stops being
+// a thing that travels and becomes a cut that is simply there.
+//
+// Still not a literal blade — at 44x44 internal on four rungs a sword
+// mid-swing resolves to a bright stick (`swordfall` gets a real blade because
+// TALL_FRAME gives it 44x88 to work with). And still distinct from the `slash`
+// matrix kind, which is a thin single arc stroke with no mass (drawSlash,
+// unchanged).
 
 /** Frames the registry allots to ONE cleave. `cycleMode: 'frames'` multiplies
  *  SET_PIECES.cleave.frames by the cycle count, so this is how a draw call
@@ -1526,19 +1541,19 @@ function drawRingOfFireFront(
  *  base frame count in scripts/vfx-registry-check.ts. */
 export const CLEAVE_FRAMES_PER_CYCLE = 4;
 
-const CLEAVE_RADIUS = 33;
-const CLEAVE_SEGMENTS = 20;
-const CLEAVE_START_ANGLE = -0.8 * Math.PI;
-const CLEAVE_SPAN = 1.06 * Math.PI;
-const CLEAVE_LEAD_WIDTH = 11;
-const CLEAVE_TAIL_WIDTH = 1.5;
-// Extent: worst case is the TINT layer, not the front layer alone —
-// drawCleaveTint's cleaveBand() call passes widthScale: 2.1 (see below), so
-// its extent is CLEAVE_RADIUS + CLEAVE_LEAD_WIDTH * 2.1 / 2 = 44.55 of the
-// square frame's <=62 design-px half-budget (behind, at widthScale 1.6, is
-// 41.8; front, at widthScale 1, is 38.5 — the number this comment used to
-// state as if it were the worst case). Still inside budget, but the real
-// headroom is 17.45px, not the 23.5px the front-only number implied.
+/** The two diagonals, in canvas radians (y grows DOWNWARD, so a positive
+ *  angle descends): DOWN_RIGHT runs top-left to bottom-right, DOWN_LEFT is its
+ *  mirror. Expressing the mirror as a second angle rather than a ctx.scale(-1)
+ *  is what lets this kind hold to the module's no-transform convention. */
+const CLEAVE_DOWN_RIGHT = 0.25 * Math.PI;
+const CLEAVE_DOWN_LEFT = 0.75 * Math.PI;
+
+const CLEAVE_HALF_LENGTH = 50;
+const CLEAVE_HALF_WIDTH = 6;
+// Extent: worst case is the TINT layer, which passes widthScale 2. A lens on a
+// 45-degree diagonal reaches (CLEAVE_HALF_LENGTH + CLEAVE_HALF_WIDTH * 2) /
+// sqrt(2) = 43.8 design-px along each axis, against the square frame's <=62
+// half-budget. behind (widthScale 1.5) is 41.7; front (1) is 39.6.
 
 /** Which cleave of the flurry `progress` falls in, and how far through it.
  *
@@ -1549,64 +1564,109 @@ const CLEAVE_TAIL_WIDTH = 1.5;
 function cleavePhase(
   def: VfxDef,
   progress: number,
-): { t: number; mirror: boolean; rotate: number } {
+): { t: number; index: number } {
   const count = Math.max(1, Math.round(def.frames / CLEAVE_FRAMES_PER_CYCLE));
   const scaled = progress * count;
   // Math.min guards the progress === 1 endpoint. frameProgress samples frame
   // midpoints so it never actually reaches 1, but drawEffectAt is also called
   // directly by the aio-editor preview's scrubber.
   const index = Math.min(count - 1, Math.floor(scaled));
-  return {
-    t: scaled - index,
-    // Cleave 2 is the mirror of cleave 1 — that is what makes the X.
-    mirror: index % 2 === 1,
-    // Cleave 3 comes in steeper rather than mirroring back onto cleave 1.
-    rotate: index === 2 ? -0.2 * Math.PI : 0,
-  };
+  return { t: scaled - index, index };
 }
 
-/** Strokes one crescent: a band along CLEAVE_RADIUS from the sweep's start to
- *  its current leading edge, thickening and brightening toward that edge. */
-function cleaveBand(
+/** The combo: cut 1 down-right, cut 2 down-left, cut 3 BOTH at once — an X.
+ *
+ *  The third cut differs STRUCTURALLY rather than by angle, which is what
+ *  stops `-x3` reading as a stutter. The previous version rotated cut 3 just
+ *  36 degrees off cut 1, so once the mirrored second cut had been and gone the
+ *  third simply echoed the first. `-x2` was always fine because two opposed
+ *  diagonals are a genuine X; `-x3` now escalates to that X landing at once. */
+function cleaveCut(index: number): { downRight: boolean; downLeft: boolean } {
+  return { downRight: index !== 1, downLeft: index !== 0 };
+}
+
+/** Fills one lens along `angle`: pointed at both tips, thickest at the middle.
+ *  Strokes nothing — a stroked path gets caps, and a cap is what made the old
+ *  arc read as a projectile head. */
+function cleaveLens(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
-  phase: { t: number; mirror: boolean; rotate: number },
+  angle: number,
+  t: number,
   colour: string,
   widthScale: number,
   alphaScale: number,
 ): void {
-  const lead = CLEAVE_START_ANGLE + phase.t * CLEAVE_SPAN;
+  // A cut is already there by the time you see it, so it opens most of the way
+  // on its first frame and then holds. Growing it in evenly would read as a
+  // beam being extruded rather than a blade passing through.
+  const grow = Math.min(1, 0.55 + t * 1.8);
+  const fade = t < 0.4 ? 1 : 1 - ((t - 0.4) / 0.6) * 0.85;
 
-  ctx.save();
-  ctx.translate(cx, cy);
-  if (phase.rotate !== 0) ctx.rotate(phase.rotate);
-  if (phase.mirror) ctx.scale(-1, 1);
-  ctx.translate(-cx, -cy);
+  const halfLen = CLEAVE_HALF_LENGTH * grow;
+  const halfWid = CLEAVE_HALF_WIDTH * widthScale;
+  const ax = Math.cos(angle) * halfLen;
+  const ay = Math.sin(angle) * halfLen;
+  // Control points sit at TWICE the intended mid-width: a quadratic Bezier
+  // passes through the midpoint of (chord midpoint, control point), so it only
+  // reaches half way to its control. Using halfWid directly would draw a lens
+  // half as thick as every extent number in this section assumes.
+  const px = -Math.sin(angle) * halfWid * 2;
+  const py = Math.cos(angle) * halfWid * 2;
 
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = colour;
-  for (let i = 0; i < CLEAVE_SEGMENTS; i++) {
-    const f = i / CLEAVE_SEGMENTS;
-    const a0 = CLEAVE_START_ANGLE + (lead - CLEAVE_START_ANGLE) * f;
-    const a1 =
-      CLEAVE_START_ANGLE +
-      (lead - CLEAVE_START_ANGLE) * ((i + 1) / CLEAVE_SEGMENTS);
-    ctx.lineWidth =
-      (CLEAVE_TAIL_WIDTH + (CLEAVE_LEAD_WIDTH - CLEAVE_TAIL_WIDTH) * f) *
-      widthScale;
-    // Tail is faint, leading edge solid; the whole band fades as it completes.
-    ctx.globalAlpha = (0.2 + 0.8 * f) * alphaScale * (1 - phase.t * 0.35);
-    ctx.beginPath();
-    ctx.arc(cx, cy, CLEAVE_RADIUS, a0, a1);
-    ctx.stroke();
+  ctx.globalAlpha = fade * alphaScale;
+  ctx.fillStyle = colour;
+  ctx.beginPath();
+  ctx.moveTo(cx + ax, cy + ay);
+  ctx.quadraticCurveTo(cx + px, cy + py, cx - ax, cy - ay);
+  ctx.quadraticCurveTo(cx - px, cy - py, cx + ax, cy + ay);
+  ctx.closePath();
+  ctx.fill();
+  // globalAlpha is the one non-default this leaves behind; restore it for the
+  // combo layer that may be painted straight after (module header convention).
+  ctx.globalAlpha = 1;
+}
+
+/** Draws whichever diagonals the current cut calls for — one, or both for the
+ *  X finisher. Shared by all three depth layers, which differ only in colour,
+ *  width and alpha. */
+function cleaveCuts(
+  ctx: CanvasRenderingContext2D,
+  def: VfxDef,
+  progress: number,
+  cx: number,
+  cy: number,
+  colour: string,
+  widthScale: number,
+  alphaScale: number,
+): void {
+  const { t, index } = cleavePhase(def, progress);
+  const cut = cleaveCut(index);
+  if (cut.downRight) {
+    cleaveLens(
+      ctx,
+      cx,
+      cy,
+      CLEAVE_DOWN_RIGHT,
+      t,
+      colour,
+      widthScale,
+      alphaScale,
+    );
   }
-
-  // ctx.restore() already undoes lineWidth/globalAlpha/strokeStyle/lineCap
-  // (everything this function touched) along with the transform — no manual
-  // reset needed, and one here would clobber a non-default caller state
-  // instead of restoring it.
-  ctx.restore();
+  if (cut.downLeft) {
+    cleaveLens(
+      ctx,
+      cx,
+      cy,
+      CLEAVE_DOWN_LEFT,
+      t,
+      colour,
+      widthScale,
+      alphaScale,
+    );
+  }
 }
 
 function drawCleaveBehind(
@@ -1616,9 +1676,9 @@ function drawCleaveBehind(
   cx: number,
   cy: number,
 ): void {
-  // Wider and dimmer than the front core, so the tail reads as passing BEHIND
-  // the target rather than across it.
-  cleaveBand(ctx, cx, cy, cleavePhase(def, progress), base(def), 1.6, 0.45);
+  // Wider and dimmer than the front core, so the cut's body reads as passing
+  // BEHIND the target rather than sitting flat across it.
+  cleaveCuts(ctx, def, progress, cx, cy, base(def), 1.5, 0.45);
 }
 
 function drawCleaveTint(
@@ -1630,15 +1690,7 @@ function drawCleaveTint(
 ): void {
   // Additive bloom onto the target. Low alpha: the tint layer is composited
   // `add` regardless of def.additive, so anything heavy here blows out.
-  cleaveBand(
-    ctx,
-    cx,
-    cy,
-    cleavePhase(def, progress),
-    rung(def, RAMP_BASE + 1),
-    2.1,
-    0.3,
-  );
+  cleaveCuts(ctx, def, progress, cx, cy, rung(def, RAMP_BASE + 1), 2, 0.3);
 }
 
 function drawCleaveFront(
@@ -1648,33 +1700,16 @@ function drawCleaveFront(
   cx: number,
   cy: number,
 ): void {
-  const phase = cleavePhase(def, progress);
-  cleaveBand(ctx, cx, cy, phase, rung(def, RAMP_BASE + 1), 1, 1);
+  cleaveCuts(ctx, def, progress, cx, cy, rung(def, RAMP_BASE + 1), 1, 1);
 
-  // Spark flash at maximum extension — the moment the edge bites. Confined to
-  // the back half of each cleave so a flurry flashes once per cycle.
-  if (phase.t > 0.5) {
-    const lead = CLEAVE_START_ANGLE + phase.t * CLEAVE_SPAN;
-    ctx.save();
-    ctx.translate(cx, cy);
-    if (phase.rotate !== 0) ctx.rotate(phase.rotate);
-    if (phase.mirror) ctx.scale(-1, 1);
-    ctx.translate(-cx, -cy);
-    ctx.globalAlpha = 1 - (phase.t - 0.5) * 2;
-    ctx.fillStyle = rung(def, RAMP_BASE + 2);
-    ctx.beginPath();
-    ctx.arc(
-      cx + Math.cos(lead) * CLEAVE_RADIUS,
-      cy + Math.sin(lead) * CLEAVE_RADIUS,
-      4,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fill();
-    // ctx.restore() already undoes globalAlpha/fillStyle and the transform —
-    // see the same note in cleaveBand above.
-    ctx.restore();
-  }
+  // Hot core down the spine of the cut — the edge itself. Thin enough that the
+  // quantiser keeps it a line instead of merging it into the body.
+  //
+  // This replaces the old travelling spark at the arc's leading point, which
+  // was doing more than its share of the "fireball" impression: a bright round
+  // head at the front of a moving shape reads as a projectile no matter what
+  // trails behind it. A cut has an edge, not a nose.
+  cleaveCuts(ctx, def, progress, cx, cy, rung(def, RAMP_BASE + 2), 0.35, 1);
 }
 
 // ---- swordfall ------------------------------------------------------------
