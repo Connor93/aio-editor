@@ -1923,6 +1923,144 @@ function drawSwordfallFront(
   ctx.globalAlpha = 1;
 }
 
+// ---- whirlwind ------------------------------------------------------------
+// A funnel, narrow at the ground and widening upward, drawn as a stack of
+// horizontal ellipse bands that sway. The BACK half of each band goes on
+// `behind` and the FRONT half on `front`, which is what makes the funnel read
+// as enclosing the target rather than as a decal pasted over it. That split is
+// the whole reason this is a set piece and not a matrix kind.
+//
+// Distinct from the `vortex` matrix kind, which is three stroked arms in a
+// square frame (drawVortex, unchanged).
+
+/** Design px above the ground point. Guarded against TALL_FRAME.groundY. */
+export const WHIRLWIND_HEIGHT = 168;
+/** Half-width of the topmost (widest) band. Guarded against the frame width. */
+export const WHIRLWIND_TOP_HALF_W = 40;
+/** Peak horizontal sway of a band's centre; stacks on the width for extent. */
+export const WHIRLWIND_SWAY = 6;
+
+const WHIRLWIND_BASE_HALF_W = 10;
+const WHIRLWIND_BANDS = 9;
+/** Vertical squash of each band's ellipse — an isometric-looking ring. */
+const WHIRLWIND_BAND_FLATTEN = 0.32;
+
+/** Geometry of band `i`, shared by all three layers so they cannot drift.
+ *  `f` runs 0 at the ground to 1 at the top. Phase comes from `i` directly,
+ *  NOT from indexFrac — see the module note on ring-of-fire's aliasing. */
+function whirlwindBand(
+  progress: number,
+  cx: number,
+  cy: number,
+  i: number,
+): { x: number; y: number; rx: number; ry: number } {
+  const f = i / (WHIRLWIND_BANDS - 1);
+  const rx =
+    WHIRLWIND_BASE_HALF_W + (WHIRLWIND_TOP_HALF_W - WHIRLWIND_BASE_HALF_W) * f;
+  return {
+    x: cx + Math.sin(progress * Math.PI * 2 + f * 3.1) * WHIRLWIND_SWAY * f,
+    y: cy - WHIRLWIND_HEIGHT * f,
+    rx,
+    ry: rx * WHIRLWIND_BAND_FLATTEN,
+  };
+}
+
+/** Strokes one half of every band. `nearHalf` picks the lower arc (0..PI in
+ *  canvas radians, y growing downward) for the front layer, the upper arc for
+ *  the behind layer. */
+function whirlwindBands(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  cx: number,
+  cy: number,
+  nearHalf: boolean,
+  colour: string,
+  alphaScale: number,
+): void {
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = 2;
+  for (let i = 0; i < WHIRLWIND_BANDS; i++) {
+    const b = whirlwindBand(progress, cx, cy, i);
+    // Upper bands are fainter, so the funnel dissolves into the air rather
+    // than ending on a hard rim.
+    ctx.globalAlpha = alphaScale * (1 - (i / (WHIRLWIND_BANDS - 1)) * 0.45);
+    ctx.beginPath();
+    ctx.ellipse(
+      b.x,
+      b.y,
+      b.rx,
+      b.ry,
+      0,
+      nearHalf ? 0 : Math.PI,
+      nearHalf ? Math.PI : Math.PI * 2,
+    );
+    ctx.stroke();
+  }
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
+}
+
+function drawWhirlwindBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Ground scuff first, so the funnel's far wall strokes over it.
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 26, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  whirlwindBands(ctx, progress, cx, cy, false, base(def), 0.7);
+}
+
+function drawWhirlwindTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Additive swirl on the target. Low alpha: the tint layer composites `add`
+  // regardless of def.additive, so anything heavy here blows out.
+  whirlwindBands(ctx, progress, cx, cy, true, rung(def, RAMP_BASE + 1), 0.28);
+}
+
+function drawWhirlwindFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  whirlwindBands(ctx, progress, cx, cy, true, rung(def, RAMP_BASE + 1), 1);
+
+  // Debris orbiting the funnel. Each mote's angle and height come from its
+  // index arithmetically, so the six stay genuinely spread.
+  const motes = 6;
+  ctx.fillStyle = rung(def, RAMP_BASE + 2);
+  for (let i = 0; i < motes; i++) {
+    const f = (i * 2 + 1) / (motes * 2);
+    const b = whirlwindBand(progress, cx, cy, f * (WHIRLWIND_BANDS - 1));
+    const a = progress * Math.PI * 4 + i * ((Math.PI * 2) / motes);
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(
+      b.x + Math.cos(a) * b.rx,
+      b.y + Math.sin(a) * b.ry,
+      2,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
 // Impacts: short, punchy hits. A single 4-frame cycle, no repeat —
 // 4 * 1 * 100ms = 400ms. Looping an impact reads as sluggish (see the
 // module-level cadence note below), so these get the minimum loop count.
@@ -2016,6 +2154,14 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
       behind: drawSwordfallBehind,
       tint: drawSwordfallTint,
       front: drawSwordfallFront,
+    },
+  },
+  whirlwind: {
+    ...IMPACT_TIMING,
+    draw: {
+      behind: drawWhirlwindBehind,
+      tint: drawWhirlwindTint,
+      front: drawWhirlwindFront,
     },
   },
 };

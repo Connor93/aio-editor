@@ -30,7 +30,8 @@ export type ShapeKind =
   | 'rockfall'
   | 'ring-of-fire'
   | 'cleave'
-  | 'swordfall';
+  | 'swordfall'
+  | 'whirlwind';
 
 // The three depth passes an effect can paint into, relative to the
 // character sprite: 'behind' composites under them, 'tint' blends onto them

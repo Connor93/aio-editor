@@ -70,7 +70,8 @@ type SetPieceName =
   | 'rockfall'
   | 'ring-of-fire'
   | 'cleave'
-  | 'swordfall';
+  | 'swordfall'
+  | 'whirlwind';
 
 export type CycleKey = 1 | 2 | 3;
 
@@ -174,6 +175,18 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     loops: 1,
     frameMs: 100,
     hasCycles: true,
+    cycleMode: 'loop',
+  },
+  // The first SUSTAINED tall-frame effect — every other TALL_FRAME def is a
+  // one-shot descent. loops: 3 with no cycles axis, exactly as ring-of-fire
+  // is sustained: being sustained is what a tornado IS, and a one-cycle
+  // whirlwind is not a thing anyone wants. Needs no new field.
+  whirlwind: {
+    frame: TALL_FRAME,
+    frames: 4,
+    loops: 3,
+    frameMs: 100,
+    hasCycles: false,
     cycleMode: 'loop',
   },
 };
