@@ -2217,6 +2217,105 @@ function drawArcaneRainFront(
   ctx.globalAlpha = 1;
 }
 
+// ---- poison ---------------------------------------------------------------
+// A small puff of miasma with bubbles rising out of it, body-centred on a
+// square frame. Deliberately the SMALLEST set piece: 400ms, no cycles, because
+// it is meant to fire on every DoT tick and must clear before the next one.
+//
+// The shape name matches the `poison` STATUS id in the server's pub data. They
+// are separate namespaces and the collision is harmless — do not rename either
+// to "fix" it.
+
+const POISON_BUBBLES = 5;
+const POISON_CLOUD_RX = 20;
+const POISON_RISE = 26;
+// Extent: the cloud's rx plus the outermost bubble's offset and radius,
+// 20 + 12 + 3 = 35 of the square frame's <=62 design-px half-budget.
+
+/** Bubble `i`'s offset and progress. Derived from the index arithmetically —
+ *  not indexFrac, per the module note on ring-of-fire's aliasing. */
+function poisonBubble(
+  progress: number,
+  i: number,
+): { dx: number; rise: number; r: number } {
+  const spread = ((i % 3) - 1) * 12;
+  const stagger = (i / POISON_BUBBLES) * 0.35;
+  const t = Math.min(1, Math.max(0, (progress - stagger) / (1 - stagger)));
+  return {
+    dx: spread + (i % 2 === 0 ? 3 : -3),
+    rise: t,
+    // Bubbles swell as they rise, then pop — radius collapses past t = 0.8.
+    r: t > 0.8 ? 3 * (1 - (t - 0.8) * 5) : 1.5 + t * 1.9,
+  };
+}
+
+function drawPoisonBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Low haze pooling under the body, spreading and thinning.
+  ctx.globalAlpha = 0.5 * (1 - progress * 0.6);
+  ctx.fillStyle = base(def);
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    cy + 6,
+    POISON_CLOUD_RX * (0.7 + progress * 0.5),
+    7 * (0.7 + progress * 0.5),
+    0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawPoisonTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Sickly wash over the target. Composited `add`, so keep it faint.
+  ctx.globalAlpha = 0.22 * (1 - progress);
+  ctx.fillStyle = rung(def, RAMP_BASE + 1);
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    cy,
+    POISON_CLOUD_RX,
+    POISON_CLOUD_RX * 0.75,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawPoisonFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  for (let i = 0; i < POISON_BUBBLES; i++) {
+    const b = poisonBubble(progress, i);
+    if (b.r <= 0) continue;
+    ctx.globalAlpha = 0.9 * (1 - b.rise * 0.5);
+    ctx.fillStyle = rung(def, RAMP_BASE + (b.rise > 0.6 ? 2 : 1));
+    ctx.beginPath();
+    ctx.arc(cx + b.dx, cy - b.rise * POISON_RISE, b.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
 // Impacts: short, punchy hits. A single 4-frame cycle, no repeat —
 // 4 * 1 * 100ms = 400ms. Looping an impact reads as sluggish (see the
 // module-level cadence note below), so these get the minimum loop count.
@@ -2326,6 +2425,14 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
       behind: drawArcaneRainBehind,
       tint: drawArcaneRainTint,
       front: drawArcaneRainFront,
+    },
+  },
+  poison: {
+    ...IMPACT_TIMING,
+    draw: {
+      behind: drawPoisonBehind,
+      tint: drawPoisonTint,
+      front: drawPoisonFront,
     },
   },
 };

@@ -72,7 +72,8 @@ type SetPieceName =
   | 'cleave'
   | 'swordfall'
   | 'whirlwind'
-  | 'arcane-rain';
+  | 'arcane-rain'
+  | 'poison';
 
 export type CycleKey = 1 | 2 | 3;
 
@@ -200,6 +201,18 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     loops: 1,
     frameMs: 100,
     hasCycles: true,
+    cycleMode: 'loop',
+  },
+  // SQUARE_FRAME so it sits on the NPC's body, not at its feet. 4 * 100ms =
+  // 400ms with no cycles — it is intended to fire on every DoT tick, and the
+  // authored poison status ticks at 1000ms, so it must complete and clear
+  // before the next tick. The duration is asserted in vfx-registry-check.ts.
+  poison: {
+    frame: SQUARE_FRAME,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
+    hasCycles: false,
     cycleMode: 'loop',
   },
 };
