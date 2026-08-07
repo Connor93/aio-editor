@@ -2232,6 +2232,32 @@ const POISON_RISE = 26;
 // Extent: the cloud's rx plus the outermost bubble's offset and radius,
 // 20 + 12 + 3 = 35 of the square frame's <=62 design-px half-budget.
 
+/** Fraction of a bubble's own post-stagger span `t` at which it begins to
+ *  pop — radius collapses linearly from its swell peak toward 0, reaching 0
+ *  exactly at t = 1 (never sampled, see below).
+ *
+ *  Was 0.8 with slope 5 (also derived as 1/(1 - 0.8), reaching 0 at t = 1).
+ *  frameProgress samples frame MIDPOINTS (see render.ts) — 0.125/0.375/
+ *  0.625/0.875 for a 4-frame cycle, never 0 or 1 — and with the original
+ *  0.35-fraction stagger, only bubbles i=0..2 crossed 0.8 with enough room
+ *  left before the last sample (progress 0.875) to read as a visible
+ *  frame-to-frame collapse; i=3 barely moved and i=4 was STILL SWELLING
+ *  frame to frame (its t at the last two samples, ~0.479 and ~0.826, never
+ *  got past the 0.8 gate until the very last sample, and even then only by
+ *  0.026 — nowhere near enough drop to read as a pop). Reachable but
+ *  invisible for 2 of 5 bubbles — the same class of bug as Task 2's dead
+ *  landing branch, caught the same way: by comparing consecutive SAMPLED
+ *  frames against each other, not a bubble's own unreachable peak.
+ *
+ *  0.65 keeps every bubble's second-to-last sample (t <= 0.625 for all five
+ *  — see the per-bubble table in this project's task-3 fix report) on the
+ *  swell side of the gate, so the pop still begins fresh on the last sampled
+ *  frame for every bubble (unchanged, and intentional — see the module note
+ *  on why simultaneous popping is fine for a 400ms puff), while leaving each
+ *  bubble comfortably far past the gate by the last sample: verified
+ *  arithmetically for all 5 bubbles, frame-to-frame drops range 43.7%-63.7%. */
+const POISON_POP_T = 0.65;
+
 /** Bubble `i`'s offset and progress. Derived from the index arithmetically —
  *  not indexFrac, per the module note on ring-of-fire's aliasing. */
 function poisonBubble(
@@ -2241,11 +2267,16 @@ function poisonBubble(
   const spread = ((i % 3) - 1) * 12;
   const stagger = (i / POISON_BUBBLES) * 0.35;
   const t = Math.min(1, Math.max(0, (progress - stagger) / (1 - stagger)));
+  const peakR = 1.5 + POISON_POP_T * 1.9;
   return {
     dx: spread + (i % 2 === 0 ? 3 : -3),
     rise: t,
-    // Bubbles swell as they rise, then pop — radius collapses past t = 0.8.
-    r: t > 0.8 ? 3 * (1 - (t - 0.8) * 5) : 1.5 + t * 1.9,
+    // Bubbles swell as they rise, then pop — radius collapses past
+    // t = POISON_POP_T, reaching 0 at t = 1.
+    r:
+      t > POISON_POP_T
+        ? peakR * (1 - (t - POISON_POP_T) / (1 - POISON_POP_T))
+        : 1.5 + t * 1.9,
   };
 }
 
