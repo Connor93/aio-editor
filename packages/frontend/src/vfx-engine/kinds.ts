@@ -1933,10 +1933,16 @@ function drawSwordfallFront(
 // Distinct from the `vortex` matrix kind, which is three stroked arms in a
 // square frame (drawVortex, unchanged).
 
-/** Design px above the ground point. Guarded against TALL_FRAME.groundY. */
-export const WHIRLWIND_HEIGHT = 168;
-/** Half-width of the topmost (widest) band. Guarded against the frame width. */
-export const WHIRLWIND_TOP_HALF_W = 40;
+/** Design px above the ground point. Guarded against TALL_FRAME.groundY.
+ *  Halved from 168 after playtesting — at full height the funnel towered over
+ *  the target and dominated the screen for its whole 1200ms. */
+export const WHIRLWIND_HEIGHT = 84;
+/** Half-width of the topmost (widest) band. Guarded against the frame width.
+ *  Trimmed 40 -> 30 alongside the height halving: keeping the old width over
+ *  half the height would have doubled the flare angle and turned the funnel
+ *  into a shallow bowl. This is the one number here not taken straight from
+ *  the "make it half as tall" note, and it is easy to put back. */
+export const WHIRLWIND_TOP_HALF_W = 30;
 /** Peak horizontal sway of a band's centre; stacks on the width for extent. */
 export const WHIRLWIND_SWAY = 6;
 
@@ -2013,7 +2019,7 @@ function drawWhirlwindBehind(
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = base(def);
   ctx.beginPath();
-  ctx.ellipse(cx, cy, 26, 9, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, 20, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
 
@@ -2085,8 +2091,8 @@ const ARCANE_MOTES = 7;
 /** Design px above the ground point a mote starts at. Exported: guarded with
  *  ARCANE_STREAK_LEN against TALL_FRAME.groundY in
  *  scripts/vfx-registry-check.ts, mirroring WHIRLWIND_HEIGHT's guard. */
-export const ARCANE_START_ABOVE = 172;
-const ARCANE_SPREAD = 34;
+export const ARCANE_START_ABOVE = 96;
+const ARCANE_SPREAD = 22;
 /** Fraction of the effect spent launching motes; the last one starts here. */
 const ARCANE_STAGGER = 0.45;
 /** Fraction of a mote's OWN post-launch span `t` (NOT raw `progress`) at
@@ -2111,7 +2117,7 @@ const ARCANE_LAND_T = 0.55;
 /** Length of the front layer's motion streak trailing above a falling mote;
  *  stacks on ARCANE_START_ABOVE for the worst-case above-cy extent. Exported
  *  for the same guard as ARCANE_START_ABOVE. */
-export const ARCANE_STREAK_LEN = 14;
+export const ARCANE_STREAK_LEN = 9;
 
 /** Where mote `i` is, and whether it has landed.
  *
@@ -2154,7 +2160,7 @@ function drawArcaneRainBehind(
     if (!m.landed) continue;
     ctx.globalAlpha = 0.55;
     ctx.beginPath();
-    ctx.ellipse(cx + m.dx, cy, 9, 3.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + m.dx, cy, 6, 2.5, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -2177,7 +2183,7 @@ function drawArcaneRainTint(
     ctx.arc(
       cx + m.dx,
       cy - ARCANE_START_ABOVE * (1 - m.fall),
-      5,
+      3.5,
       0,
       Math.PI * 2,
     );
@@ -2202,7 +2208,7 @@ function drawArcaneRainFront(
       ctx.globalAlpha = 0.9;
       ctx.fillStyle = rung(def, RAMP_BASE + 2);
       ctx.beginPath();
-      ctx.arc(x, cy, 4, 0, Math.PI * 2);
+      ctx.arc(x, cy, 3, 0, Math.PI * 2);
       ctx.fill();
       continue;
     }
@@ -2220,10 +2226,10 @@ function drawArcaneRainFront(
     ctx.globalAlpha = 1;
     ctx.fillStyle = rung(def, RAMP_BASE + 2);
     ctx.beginPath();
-    ctx.moveTo(x, y - 4);
-    ctx.lineTo(x + 3, y);
-    ctx.lineTo(x, y + 4);
-    ctx.lineTo(x - 3, y);
+    ctx.moveTo(x, y - 3);
+    ctx.lineTo(x + 2, y);
+    ctx.lineTo(x, y + 3);
+    ctx.lineTo(x - 2, y);
     ctx.closePath();
     ctx.fill();
   }
