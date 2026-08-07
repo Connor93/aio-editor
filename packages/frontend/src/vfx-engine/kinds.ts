@@ -2068,10 +2068,36 @@ function drawWhirlwindFront(
 // kind, twelve simultaneous streaks in a square frame (drawRain, unchanged).
 
 const ARCANE_MOTES = 7;
-const ARCANE_START_ABOVE = 172;
+/** Design px above the ground point a mote starts at. Exported: guarded with
+ *  ARCANE_STREAK_LEN against TALL_FRAME.groundY in
+ *  scripts/vfx-registry-check.ts, mirroring WHIRLWIND_HEIGHT's guard. */
+export const ARCANE_START_ABOVE = 172;
 const ARCANE_SPREAD = 34;
 /** Fraction of the effect spent launching motes; the last one starts here. */
 const ARCANE_STAGGER = 0.45;
+/** Fraction of a mote's OWN post-launch span `t` (NOT raw `progress`) at
+ *  which it lands. Must be < 1: frameProgress samples frame MIDPOINTS (see
+ *  render.ts) — 0.125/0.375/0.625/0.875 for a 4-frame cycle — so `progress`
+ *  structurally never reaches 1 and the original `landed: t >= 1` (with `t`
+ *  itself only reaching 1 at progress === 1) was dead code: every mote fell
+ *  forever and the ground splash / pop flare / tint cutoff never rendered.
+ *
+ *  `fall` (below) is normalised against this SAME threshold via `fallT`, not
+ *  against `t`'s own [0,1] range — the naive fix of just lowering the
+ *  `landed` bar while leaving `fall: t * t` would still solve "mote reaches
+ *  cy" only at t===1, popping the splash while the mote is still mid-air.
+ *
+ *  Calibrated the same way the sibling descents are: SWORDFALL_LAND_PROGRESS
+ *  (0.5) and ROCKFALL_LAND_PROGRESS ([0.375, 0.625, 0.875]) are both values
+ *  the sampler actually visits. Verified arithmetically (not just eyeballed)
+ *  that all 7 motes land within the 4 sampled frames at this value — 3 land
+ *  on frame 2 (progress 0.625), 4 on frame 3 (progress 0.875); see the
+ *  per-mote table in this project's task-2 report. */
+const ARCANE_LAND_T = 0.55;
+/** Length of the front layer's motion streak trailing above a falling mote;
+ *  stacks on ARCANE_START_ABOVE for the worst-case above-cy extent. Exported
+ *  for the same guard as ARCANE_START_ABOVE. */
+export const ARCANE_STREAK_LEN = 14;
 
 /** Where mote `i` is, and whether it has landed.
  *
@@ -2090,8 +2116,12 @@ function arcaneMote(
   const delay = (i / (ARCANE_MOTES - 1)) * ARCANE_STAGGER;
   const span = 1 - delay;
   const t = span <= 0 ? 1 : Math.min(1, Math.max(0, (progress - delay) / span));
+  // fallT reaches 1 exactly when t reaches ARCANE_LAND_T, so the mote sits at
+  // cy (fall === 1) the same instant `landed` flips true — see ARCANE_LAND_T's
+  // doc comment above for why `t >= 1` / `fall: t * t` was the bug.
+  const fallT = Math.min(1, t / ARCANE_LAND_T);
   // Accelerating fall — a linear descent reads as a lift, not a drop.
-  return { dx, fall: t * t, landed: t >= 1 };
+  return { dx, fall: fallT * fallT, landed: t >= ARCANE_LAND_T };
 }
 
 function drawArcaneRainBehind(
@@ -2169,7 +2199,7 @@ function drawArcaneRainFront(
     ctx.strokeStyle = rung(def, RAMP_BASE + 1);
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(x, y - 14);
+    ctx.moveTo(x, y - ARCANE_STREAK_LEN);
     ctx.lineTo(x, y);
     ctx.stroke();
 
