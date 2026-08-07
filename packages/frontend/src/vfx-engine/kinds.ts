@@ -2087,61 +2087,76 @@ function drawWhirlwindFront(
 // if they fall in unison — which is also the difference from the `rain` matrix
 // kind, twelve simultaneous streaks in a square frame (drawRain, unchanged).
 
-const ARCANE_MOTES = 7;
+/** Coprime with ARCANE_PHASE_STRIDE — see that constant. More motes read as
+ *  denser rain at no texture cost: the effect is still four rasterised frames
+ *  regardless. */
+const ARCANE_MOTES = 9;
 /** Design px above the ground point a mote starts at. Exported: guarded with
  *  ARCANE_STREAK_LEN against TALL_FRAME.groundY in
  *  scripts/vfx-registry-check.ts, mirroring WHIRLWIND_HEIGHT's guard. */
 export const ARCANE_START_ABOVE = 96;
 const ARCANE_SPREAD = 22;
-/** Fraction of the effect spent launching motes; the last one starts here. */
-const ARCANE_STAGGER = 0.45;
-/** Fraction of a mote's OWN post-launch span `t` (NOT raw `progress`) at
- *  which it lands. Must be < 1: frameProgress samples frame MIDPOINTS (see
- *  render.ts) — 0.125/0.375/0.625/0.875 for a 4-frame cycle — so `progress`
- *  structurally never reaches 1 and the original `landed: t >= 1` (with `t`
- *  itself only reaching 1 at progress === 1) was dead code: every mote fell
- *  forever and the ground splash / pop flare / tint cutoff never rendered.
- *
- *  `fall` (below) is normalised against this SAME threshold via `fallT`, not
- *  against `t`'s own [0,1] range — the naive fix of just lowering the
- *  `landed` bar while leaving `fall: t * t` would still solve "mote reaches
- *  cy" only at t===1, popping the splash while the mote is still mid-air.
- *
- *  Calibrated the same way the sibling descents are: SWORDFALL_LAND_PROGRESS
- *  (0.5) and ROCKFALL_LAND_PROGRESS ([0.375, 0.625, 0.875]) are both values
- *  the sampler actually visits. Verified arithmetically (not just eyeballed)
- *  that all 7 motes land within the 4 sampled frames at this value — 3 land
- *  on frame 2 (progress 0.625), 4 on frame 3 (progress 0.875); see the
- *  per-mote table in this project's task-2 report. */
-const ARCANE_LAND_T = 0.55;
+/** Stride used to scatter phase offsets around the mote ring. MUST be coprime
+ *  with ARCANE_MOTES so `(i * stride) % motes` visits every slot exactly once.
+ *  Its job is to DECORRELATE a mote's horizontal position from its phase: with
+ *  a stride of 1, `dx` and phase both climb with `i`, and the rain reads as a
+ *  tidy sweep opening outward from the centre rather than as weather. */
+const ARCANE_PHASE_STRIDE = 4;
+/** Fraction of each mote's own wrapping phase spent falling; the rest is its
+ *  ground splash. ~0.78 keeps most motes in the air at any instant while
+ *  guaranteeing one or two are always splashing. */
+const ARCANE_FALL_FRAC = 0.78;
 /** Length of the front layer's motion streak trailing above a falling mote;
  *  stacks on ARCANE_START_ABOVE for the worst-case above-cy extent. Exported
  *  for the same guard as ARCANE_START_ABOVE. */
 export const ARCANE_STREAK_LEN = 9;
 
-/** Where mote `i` is, and whether it has landed.
+/** Where mote `i` is: how far through its fall, or how old its splash is.
  *
- *  Both the horizontal offset and the launch delay come from `i` through plain
- *  arithmetic — deliberately NOT indexFrac, whose 2.399 constant aliased
- *  ring-of-fire's tongues into a narrow band while looking independent. */
+ *  Each mote runs its own WRAPPING phase rather than falling once. That is
+ *  what makes this read as rain instead of a volley: at any instant the motes
+ *  are scattered all through the fall, and one that lands recycles to the top
+ *  rather than sitting on the ground for the rest of the effect. The earlier
+ *  model launched every mote inside the first 45% and left it landed, so the
+ *  whole population fell together and then stopped — a batch, not weather.
+ *
+ *  The phase advances EXACTLY one turn per cycle, so frame 3 -> frame 0 of the
+ *  next loop is an ordinary step and `-x2`/`-x3` are seamless. Same rule as
+ *  whirlwind's debris and ring-of-fire's flicker (see the module's LOOP
+ *  SEAMLESSNESS note): frameProgress only samples frame MIDPOINTS, so a driver
+ *  advancing more than one turn per cycle aliases onto a handful of repeated
+ *  positions instead of moving.
+ *
+ *  Offsets and phase both come from `i` through plain arithmetic —
+ *  deliberately NOT indexFrac, whose 2.399 constant aliased ring-of-fire's
+ *  tongues into a narrow band while looking independent. */
 function arcaneMote(
   progress: number,
   i: number,
-): { dx: number; fall: number; landed: boolean } {
+): { dx: number; fall: number; landed: boolean; age: number } {
   // Alternating outward placement: 0, +1, -1, +2, -2, ... spread evenly.
   const rank = Math.ceil(i / 2);
   const side = i % 2 === 0 ? 1 : -1;
   const dx = (rank / Math.ceil((ARCANE_MOTES - 1) / 2)) * ARCANE_SPREAD * side;
 
-  const delay = (i / (ARCANE_MOTES - 1)) * ARCANE_STAGGER;
-  const span = 1 - delay;
-  const t = span <= 0 ? 1 : Math.min(1, Math.max(0, (progress - delay) / span));
-  // fallT reaches 1 exactly when t reaches ARCANE_LAND_T, so the mote sits at
-  // cy (fall === 1) the same instant `landed` flips true — see ARCANE_LAND_T's
-  // doc comment above for why `t >= 1` / `fall: t * t` was the bug.
-  const fallT = Math.min(1, t / ARCANE_LAND_T);
-  // Accelerating fall — a linear descent reads as a lift, not a drop.
-  return { dx, fall: fallT * fallT, landed: t >= ARCANE_LAND_T };
+  // Scattered so a mote's phase does not track its horizontal position — see
+  // ARCANE_PHASE_STRIDE. `% 1` after the add is the wrap.
+  const offset = ((i * ARCANE_PHASE_STRIDE) % ARCANE_MOTES) / ARCANE_MOTES;
+  const phase = (progress + offset) % 1;
+
+  if (phase >= ARCANE_FALL_FRAC) {
+    return {
+      dx,
+      fall: 1,
+      landed: true,
+      age: (phase - ARCANE_FALL_FRAC) / (1 - ARCANE_FALL_FRAC),
+    };
+  }
+  // Accelerating fall — a linear descent reads as a lift, not a drop. Reaches
+  // exactly 1 (the ground) as `phase` reaches ARCANE_FALL_FRAC, so the splash
+  // never appears while the mote is still mid-air.
+  const fallT = phase / ARCANE_FALL_FRAC;
+  return { dx, fall: fallT * fallT, landed: false, age: 0 };
 }
 
 function drawArcaneRainBehind(
@@ -2151,16 +2166,31 @@ function drawArcaneRainBehind(
   cx: number,
   cy: number,
 ): void {
-  // Ground splashes, one per landed mote. An EMPTY behind frame before the
-  // first mote lands is CORRECT — there is nothing behind the character yet.
-  // Do not "fix" it by painting on the early frames.
+  // Ground splashes, one per currently-landed mote. Each spreads and fades
+  // over its own splash window rather than persisting — with wrapping phases a
+  // splash that never faded would sit at full strength and then blink out at
+  // the wrap.
+  //
+  // Unlike the one-shot descents, this layer is never empty: the splash window
+  // is 1 - ARCANE_FALL_FRAC of a phase (0.22) and the motes' phase offsets are
+  // spaced 1/ARCANE_MOTES apart (0.111), so at least one mote is always inside
+  // it. That is a property of those two constants — retuning either could make
+  // it empty on some frames, which would be correct rather than a bug.
   ctx.fillStyle = base(def);
   for (let i = 0; i < ARCANE_MOTES; i++) {
     const m = arcaneMote(progress, i);
     if (!m.landed) continue;
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = 0.55 * (1 - m.age);
     ctx.beginPath();
-    ctx.ellipse(cx + m.dx, cy, 6, 2.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(
+      cx + m.dx,
+      cy,
+      6 + m.age * 5,
+      2.5 + m.age * 2,
+      0,
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -2204,11 +2234,12 @@ function drawArcaneRainFront(
     const x = cx + m.dx;
 
     if (m.landed) {
-      // Pop: a brief bright flare at the point of contact.
-      ctx.globalAlpha = 0.9;
+      // Pop: a bright flare at the point of contact, shrinking and fading over
+      // its splash window so it reads as an impact rather than a parked dot.
+      ctx.globalAlpha = 0.9 * (1 - m.age);
       ctx.fillStyle = rung(def, RAMP_BASE + 2);
       ctx.beginPath();
-      ctx.arc(x, cy, 3, 0, Math.PI * 2);
+      ctx.arc(x, cy, 3 * (1 - m.age * 0.6), 0, Math.PI * 2);
       ctx.fill();
       continue;
     }
