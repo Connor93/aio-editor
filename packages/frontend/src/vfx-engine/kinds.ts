@@ -2061,6 +2061,132 @@ function drawWhirlwindFront(
   ctx.globalAlpha = 1;
 }
 
+// ---- arcane-rain ----------------------------------------------------------
+// A barrage of motes falling from off the top of the tall frame and popping on
+// contact. They are STAGGERED — the eye reads a barrage that way and a curtain
+// if they fall in unison — which is also the difference from the `rain` matrix
+// kind, twelve simultaneous streaks in a square frame (drawRain, unchanged).
+
+const ARCANE_MOTES = 7;
+const ARCANE_START_ABOVE = 172;
+const ARCANE_SPREAD = 34;
+/** Fraction of the effect spent launching motes; the last one starts here. */
+const ARCANE_STAGGER = 0.45;
+
+/** Where mote `i` is, and whether it has landed.
+ *
+ *  Both the horizontal offset and the launch delay come from `i` through plain
+ *  arithmetic — deliberately NOT indexFrac, whose 2.399 constant aliased
+ *  ring-of-fire's tongues into a narrow band while looking independent. */
+function arcaneMote(
+  progress: number,
+  i: number,
+): { dx: number; fall: number; landed: boolean } {
+  // Alternating outward placement: 0, +1, -1, +2, -2, ... spread evenly.
+  const rank = Math.ceil(i / 2);
+  const side = i % 2 === 0 ? 1 : -1;
+  const dx = (rank / Math.ceil((ARCANE_MOTES - 1) / 2)) * ARCANE_SPREAD * side;
+
+  const delay = (i / (ARCANE_MOTES - 1)) * ARCANE_STAGGER;
+  const span = 1 - delay;
+  const t = span <= 0 ? 1 : Math.min(1, Math.max(0, (progress - delay) / span));
+  // Accelerating fall — a linear descent reads as a lift, not a drop.
+  return { dx, fall: t * t, landed: t >= 1 };
+}
+
+function drawArcaneRainBehind(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Ground splashes, one per landed mote. An EMPTY behind frame before the
+  // first mote lands is CORRECT — there is nothing behind the character yet.
+  // Do not "fix" it by painting on the early frames.
+  ctx.fillStyle = base(def);
+  for (let i = 0; i < ARCANE_MOTES; i++) {
+    const m = arcaneMote(progress, i);
+    if (!m.landed) continue;
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.ellipse(cx + m.dx, cy, 9, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawArcaneRainTint(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  // Faint bloom following each mote. Composited `add`, so keep it light.
+  ctx.fillStyle = rung(def, RAMP_BASE + 1);
+  for (let i = 0; i < ARCANE_MOTES; i++) {
+    const m = arcaneMote(progress, i);
+    if (m.landed) continue;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(
+      cx + m.dx,
+      cy - ARCANE_START_ABOVE * (1 - m.fall),
+      5,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawArcaneRainFront(
+  ctx: CanvasRenderingContext2D,
+  progress: number,
+  def: VfxDef,
+  cx: number,
+  cy: number,
+): void {
+  for (let i = 0; i < ARCANE_MOTES; i++) {
+    const m = arcaneMote(progress, i);
+    const x = cx + m.dx;
+
+    if (m.landed) {
+      // Pop: a brief bright flare at the point of contact.
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = rung(def, RAMP_BASE + 2);
+      ctx.beginPath();
+      ctx.arc(x, cy, 4, 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
+
+    const y = cy - ARCANE_START_ABOVE * (1 - m.fall);
+    // Motion streak behind the mote, so a 4-frame fall reads as travel.
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = rung(def, RAMP_BASE + 1);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 14);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = rung(def, RAMP_BASE + 2);
+    ctx.beginPath();
+    ctx.moveTo(x, y - 4);
+    ctx.lineTo(x + 3, y);
+    ctx.lineTo(x, y + 4);
+    ctx.lineTo(x - 3, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
+}
+
 // Impacts: short, punchy hits. A single 4-frame cycle, no repeat —
 // 4 * 1 * 100ms = 400ms. Looping an impact reads as sluggish (see the
 // module-level cadence note below), so these get the minimum loop count.
@@ -2162,6 +2288,14 @@ export const KINDS: Record<ShapeKind, KindConfig> = {
       behind: drawWhirlwindBehind,
       tint: drawWhirlwindTint,
       front: drawWhirlwindFront,
+    },
+  },
+  'arcane-rain': {
+    ...IMPACT_TIMING,
+    draw: {
+      behind: drawArcaneRainBehind,
+      tint: drawArcaneRainTint,
+      front: drawArcaneRainFront,
     },
   },
 };

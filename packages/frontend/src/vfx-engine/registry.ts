@@ -71,7 +71,8 @@ type SetPieceName =
   | 'ring-of-fire'
   | 'cleave'
   | 'swordfall'
-  | 'whirlwind';
+  | 'whirlwind'
+  | 'arcane-rain';
 
 export type CycleKey = 1 | 2 | 3;
 
@@ -187,6 +188,18 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     loops: 3,
     frameMs: 100,
     hasCycles: false,
+    cycleMode: 'loop',
+  },
+  // A descent like smite/rockfall, and the only one of the three new shapes
+  // with the cycles axis: -x2/-x3 read as successive waves. cycleMode 'loop'
+  // because a wave is identical to its predecessor — the cheap repeat is
+  // correct here, and costs no extra textures.
+  'arcane-rain': {
+    frame: TALL_FRAME,
+    frames: 4,
+    loops: 1,
+    frameMs: 100,
+    hasCycles: true,
     cycleMode: 'loop',
   },
 };
