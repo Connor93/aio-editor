@@ -1717,13 +1717,23 @@ function drawCleaveFront(
 // the vertical room is enough for a readable silhouette. It descends
 // point-down, plants in the ground, and throws an impact ring.
 
-const SWORDFALL_BLADE_LEN = 84;
-const SWORDFALL_BLADE_HALF_W = 5;
-const SWORDFALL_GUARD_HALF_W = 15;
-const SWORDFALL_GUARD_H = 5;
+// Design px; the tall frame rasterises at 44/128 = 0.34375 of these, so a
+// detail needs ~6 design px to survive as 2 internal px. Every number here is
+// chosen against that, not by eye.
+const SWORDFALL_BLADE_LEN = 80;
+const SWORDFALL_BLADE_HALF_W = 6;
+/** How much of the blade's length is taper. The rest runs near-parallel — a
+ *  blade that tapers along its WHOLE length is a triangle, which is what the
+ *  first version drew and why it read as blocky rather than sharp. */
+const SWORDFALL_BLADE_TAPER = 24;
+/** Central ridge. ~3 design px wide = ~1 internal px, the thinnest detail that
+ *  survives the raster, and the single line that most says "blade". */
+const SWORDFALL_FULLER_HALF_W = 1.5;
+const SWORDFALL_GUARD_HALF_W = 13;
+const SWORDFALL_GUARD_H = 7;
 const SWORDFALL_GRIP_H = 20;
-const SWORDFALL_GRIP_HALF_W = 3;
-const SWORDFALL_POMMEL_R = 4;
+const SWORDFALL_GRIP_HALF_W = 3.5;
+const SWORDFALL_POMMEL_R = 4.5;
 
 /** Planted height above the ground point: tip at cy, pommel top at
  *  cy - SWORDFALL_TOTAL_HEIGHT. Asserted against TALL_FRAME.groundY in
@@ -1761,47 +1771,78 @@ function swordfallBlade(
   above: number,
   colour: string,
   alpha: number,
+  hot: string | null,
 ): void {
   const tipY = cy - above;
   const guardY = tipY - SWORDFALL_BLADE_LEN;
+  const guardTop = guardY - SWORDFALL_GUARD_H;
+  const gripTop = guardTop - SWORDFALL_GRIP_H;
+  const w = SWORDFALL_BLADE_HALF_W;
+  const gw = SWORDFALL_GUARD_HALF_W;
 
   ctx.globalAlpha = alpha;
   ctx.fillStyle = colour;
 
-  // Blade: a tapered quad from the point up to the guard.
+  // Blade: edges run parallel from the guard down, then converge over the last
+  // SWORDFALL_BLADE_TAPER to the point. Five points, not three — the straight
+  // section is what reads as a blade instead of a spike.
+  const shoulderY = tipY - SWORDFALL_BLADE_TAPER;
   ctx.beginPath();
-  ctx.moveTo(cx, tipY);
-  ctx.lineTo(cx + SWORDFALL_BLADE_HALF_W, guardY);
-  ctx.lineTo(cx - SWORDFALL_BLADE_HALF_W, guardY);
+  ctx.moveTo(cx - w, guardY);
+  ctx.lineTo(cx + w, guardY);
+  ctx.lineTo(cx + w, shoulderY);
+  ctx.lineTo(cx, tipY);
+  ctx.lineTo(cx - w, shoulderY);
   ctx.closePath();
   ctx.fill();
 
-  // Crossguard.
-  ctx.fillRect(
-    cx - SWORDFALL_GUARD_HALF_W,
-    guardY - SWORDFALL_GUARD_H,
-    SWORDFALL_GUARD_HALF_W * 2,
-    SWORDFALL_GUARD_H,
-  );
-
-  // Grip.
-  ctx.fillRect(
-    cx - SWORDFALL_GRIP_HALF_W,
-    guardY - SWORDFALL_GUARD_H - SWORDFALL_GRIP_H,
-    SWORDFALL_GRIP_HALF_W * 2,
-    SWORDFALL_GRIP_H,
-  );
-
-  // Pommel.
+  // Crossguard: a hexagonal bar, thickest where it meets the blade and drawn
+  // to points at both ends. The first version was a plain fillRect three times
+  // the blade's width and barely over one internal pixel tall, which is a
+  // crucifix, not a hilt.
   ctx.beginPath();
-  ctx.arc(
-    cx,
-    guardY - SWORDFALL_GUARD_H - SWORDFALL_GRIP_H - SWORDFALL_POMMEL_R,
-    SWORDFALL_POMMEL_R,
-    0,
-    Math.PI * 2,
-  );
+  ctx.moveTo(cx - gw, guardY - SWORDFALL_GUARD_H * 0.4);
+  ctx.lineTo(cx - gw * 0.4, guardTop);
+  ctx.lineTo(cx + gw * 0.4, guardTop);
+  ctx.lineTo(cx + gw, guardY - SWORDFALL_GUARD_H * 0.4);
+  ctx.lineTo(cx + gw * 0.4, guardY);
+  ctx.lineTo(cx - gw * 0.4, guardY);
+  ctx.closePath();
   ctx.fill();
+
+  // Grip: narrows toward the pommel.
+  ctx.beginPath();
+  ctx.moveTo(cx - SWORDFALL_GRIP_HALF_W, guardTop);
+  ctx.lineTo(cx + SWORDFALL_GRIP_HALF_W, guardTop);
+  ctx.lineTo(cx + SWORDFALL_GRIP_HALF_W * 0.72, gripTop);
+  ctx.lineTo(cx - SWORDFALL_GRIP_HALF_W * 0.72, gripTop);
+  ctx.closePath();
+  ctx.fill();
+
+  // Pommel: a diamond. A circle this small rasterises to a shapeless blob;
+  // four straight edges keep a readable silhouette at 3 internal px.
+  const py = gripTop - SWORDFALL_POMMEL_R;
+  ctx.beginPath();
+  ctx.moveTo(cx, py - SWORDFALL_POMMEL_R);
+  ctx.lineTo(cx + SWORDFALL_POMMEL_R * 0.8, py);
+  ctx.lineTo(cx, py + SWORDFALL_POMMEL_R);
+  ctx.lineTo(cx - SWORDFALL_POMMEL_R * 0.8, py);
+  ctx.closePath();
+  ctx.fill();
+
+  // Fuller — the ridge down the blade's spine, one rung hotter. Front layer
+  // only: on the tint layer it would just brighten an already-additive wash.
+  if (hot !== null) {
+    ctx.fillStyle = hot;
+    ctx.beginPath();
+    ctx.moveTo(cx - SWORDFALL_FULLER_HALF_W, guardY);
+    ctx.lineTo(cx + SWORDFALL_FULLER_HALF_W, guardY);
+    ctx.lineTo(cx + SWORDFALL_FULLER_HALF_W, shoulderY);
+    ctx.lineTo(cx, shoulderY + SWORDFALL_BLADE_TAPER * 0.45);
+    ctx.lineTo(cx - SWORDFALL_FULLER_HALF_W, shoulderY);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   ctx.globalAlpha = 1;
 }
@@ -1845,7 +1886,7 @@ function drawSwordfallTint(
   // Bloom along the blade. Composited `add` regardless of def.additive, so
   // keep it faint — see SkillBurst's constructor comment.
   const { above } = swordfallTip(progress);
-  swordfallBlade(ctx, cx, cy, above, rung(def, RAMP_BASE + 1), 0.35);
+  swordfallBlade(ctx, cx, cy, above, rung(def, RAMP_BASE + 1), 0.35, null);
 }
 
 function drawSwordfallFront(
@@ -1856,7 +1897,15 @@ function drawSwordfallFront(
   cy: number,
 ): void {
   const { above, planted } = swordfallTip(progress);
-  swordfallBlade(ctx, cx, cy, above, rung(def, RAMP_BASE + 1), 1);
+  swordfallBlade(
+    ctx,
+    cx,
+    cy,
+    above,
+    rung(def, RAMP_BASE + 1),
+    1,
+    rung(def, RAMP_BASE + 2),
+  );
 
   if (!planted) return;
 
