@@ -2094,8 +2094,8 @@ const ARCANE_MOTES = 9;
 /** Design px above the ground point a mote starts at. Exported: guarded with
  *  ARCANE_STREAK_LEN against TALL_FRAME.groundY in
  *  scripts/vfx-registry-check.ts, mirroring WHIRLWIND_HEIGHT's guard. */
-export const ARCANE_START_ABOVE = 48;
-const ARCANE_SPREAD = 11;
+export const ARCANE_START_ABOVE = 55;
+const ARCANE_SPREAD = 12.65;
 /** Stride used to scatter phase offsets around the mote ring. MUST be coprime
  *  with ARCANE_MOTES so `(i * stride) % motes` visits every slot exactly once.
  *  Its job is to DECORRELATE a mote's horizontal position from its phase: with
@@ -2109,7 +2109,7 @@ const ARCANE_FALL_FRAC = 0.78;
 /** Length of the front layer's motion streak trailing above a falling mote;
  *  stacks on ARCANE_START_ABOVE for the worst-case above-cy extent. Exported
  *  for the same guard as ARCANE_START_ABOVE. */
-export const ARCANE_STREAK_LEN = 5;
+export const ARCANE_STREAK_LEN = 3.35;
 
 /** Where mote `i` is: how far through its fall, or how old its splash is.
  *
@@ -2213,7 +2213,7 @@ function drawArcaneRainTint(
     ctx.arc(
       cx + m.dx,
       cy - ARCANE_START_ABOVE * (1 - m.fall),
-      2.5,
+      1.7,
       0,
       Math.PI * 2,
     );
@@ -2257,9 +2257,9 @@ function drawArcaneRainFront(
     ctx.globalAlpha = 1;
     ctx.fillStyle = rung(def, RAMP_BASE + 2);
     ctx.beginPath();
-    ctx.moveTo(x, y - 2.5);
+    ctx.moveTo(x, y - 1.7);
     ctx.lineTo(x + 1.5, y);
-    ctx.lineTo(x, y + 2.5);
+    ctx.lineTo(x, y + 1.7);
     ctx.lineTo(x - 1.5, y);
     ctx.closePath();
     ctx.fill();
