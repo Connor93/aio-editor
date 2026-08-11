@@ -173,14 +173,20 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
   // sword strikes are identical by design, so the cheap repeat is correct.
   swordfall: {
     frame: TALL_FRAME,
-    frames: 4,
+    // 8 frames at 75ms, not 4 at 150 — the same 600ms cycle sampled twice as
+    // often. frameProgress only ever yields frame MIDPOINTS, so with 4 frames
+    // the descent got just TWO airborne samples (progress 0.125 and 0.375)
+    // before SWORDFALL_LAND_PROGRESS, and a blade crossing that much distance
+    // in two steps reads as choppy. 8 frames gives four airborne samples.
+    // Costs twice the textures for this shape, built lazily per name.
+    frames: 8,
     loops: 1,
     // 150ms, not the 100 every other set piece uses: the descent read as too
     // quick to follow. That makes a cycle 600ms and moves the blade's plant
     // from 200ms to 300ms after the damage number — a deliberate trade of
     // impact sync for legibility, asserted explicitly in
     // scripts/vfx-registry-check.ts rather than allowed to drift.
-    frameMs: 150,
+    frameMs: 75,
     hasCycles: true,
     cycleMode: 'loop',
   },

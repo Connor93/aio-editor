@@ -1951,6 +1951,47 @@ function drawSwordfallFront(
   cy: number,
 ): void {
   const { above, planted } = swordfallTip(progress);
+
+  // Motion trail across the distance covered since the previous sampled frame.
+  //
+  // The fall accelerates, so even at 8 frames the last airborne step crosses
+  // ~48 design px in 75ms. Adding frames to cover that gets expensive fast
+  // (textures scale linearly), whereas a trail spanning the actual travel is
+  // the standard way to make a large per-frame step read as speed rather than
+  // as a jump. The previous position is derived analytically from
+  // `def.frames`, so the trail always matches the real sampling cadence
+  // instead of assuming one.
+  if (!planted) {
+    const prev = swordfallTip(Math.max(0, progress - 1 / def.frames));
+    // Clamped to the frame's own headroom. The trail extends ABOVE the blade,
+    // so on the earliest frames — where the sword is already near the top —
+    // an unclamped trail would overrun the frame edge (196 and 194 design px
+    // against 192 of headroom). Deriving the cap from `def.frame.groundY`
+    // makes the trail self-limiting rather than something a separate extent
+    // assertion has to chase.
+    const headroom = Math.max(
+      0,
+      def.frame.groundY - above - SWORDFALL_BLADE_LEN,
+    );
+    const travel = Math.min(prev.above - above, headroom);
+    if (travel > 1) {
+      const tipY = cy - above;
+      const w = SWORDFALL_BLADE_HALF_W;
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = base(def);
+      ctx.beginPath();
+      // Tapers to nothing at the trailing end, so it reads as a smear behind
+      // the blade rather than a second blade.
+      ctx.moveTo(cx - w, tipY - SWORDFALL_BLADE_LEN);
+      ctx.lineTo(cx + w, tipY - SWORDFALL_BLADE_LEN);
+      ctx.lineTo(cx + w * 0.25, tipY - SWORDFALL_BLADE_LEN - travel);
+      ctx.lineTo(cx - w * 0.25, tipY - SWORDFALL_BLADE_LEN - travel);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
   swordfallBlade(
     ctx,
     cx,
@@ -2166,7 +2207,9 @@ const ARCANE_FALL_FRAC = 0.78;
 /** Width of a raindrop in DESIGN px; converted to whole cells at draw time
  *  so its on-screen size survives a change to the raster resolution. */
 const ARCANE_DROP_W = 3;
-export const ARCANE_STREAK_LEN = 6;
+/** Design-px reach of a mote's impact starburst at full extension. */
+const ARCANE_BURST_REACH = 7;
+export const ARCANE_STREAK_LEN = 13;
 
 /** Where mote `i` is: how far through its fall, or how old its splash is.
  *
@@ -2286,58 +2329,71 @@ function drawArcaneRainFront(
   cx: number,
   cy: number,
 ): void {
+  // Real geometry, NOT pixel-snapped rectangles.
+  //
+  // The snapping this replaces existed to survive the old coarse raster: at
+  // PIXEL_SCALE 3 an anti-aliased shape bled across cells that the quantiser
+  // then promoted to full alpha, so filling whole cells was the only way to
+  // keep a mote small. At 1:1 (see INTERNAL_SIZE in types.ts) that pressure is
+  // gone, and forcing whole cells is what made these read as rectangular
+  // raindrops rather than falling magic. Tapered shapes are affordable again.
   for (let i = 0; i < ARCANE_MOTES; i++) {
     const m = arcaneMote(progress, i);
     const x = cx + m.dx;
 
     if (m.landed) {
-      // Pop: a bright flare at the point of contact, shrinking and fading over
-      // its splash window so it reads as an impact rather than a parked dot.
-      ctx.globalAlpha = 0.9 * (1 - m.age);
-      ctx.fillStyle = rung(def, RAMP_BASE + 2);
+      // Impact: a short starburst rather than a dot — four spokes that shoot
+      // out and fade, which reads as something arcane breaking on the ground
+      // instead of a pebble landing.
+      const reach = ARCANE_BURST_REACH * (0.35 + m.age * 0.65);
+      ctx.globalAlpha = 0.95 * (1 - m.age);
+      ctx.strokeStyle = rung(def, RAMP_BASE + 1);
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.arc(x, cy, 2.5 * (1 - m.age * 0.6), 0, Math.PI * 2);
+      for (let a = 0; a < 4; a++) {
+        // Two axis spokes and two diagonals, the diagonals shorter so the
+        // burst has a star silhouette rather than a wheel.
+        const ang = (a / 4) * Math.PI * 2 + Math.PI / 4;
+        const len = a % 2 === 0 ? reach : reach * 0.6;
+        ctx.moveTo(x, cy);
+        ctx.lineTo(x + Math.cos(ang) * len, cy + Math.sin(ang) * len * 0.55);
+      }
+      ctx.stroke();
+
+      // Core flash, collapsing as the spokes reach out.
+      ctx.globalAlpha = 1 - m.age;
+      ctx.fillStyle = rung(def, RAMP_BASE + 1);
+      ctx.beginPath();
+      ctx.arc(x, cy, 2.2 * (1 - m.age), 0, Math.PI * 2);
       ctx.fill();
       continue;
     }
 
     const y = cy - ARCANE_START_ABOVE * (1 - m.fall);
 
-    // Drawn SNAPPED to the internal pixel grid, as whole cells.
-    //
-    // This is the only way to make a detail this small actually render small.
-    // The quantiser (render.ts) promotes ANY pixel with roughly >=12.5%
-    // coverage to FULL alpha, so an anti-aliased sub-pixel shape does not
-    // rasterise faint and tiny — it lights every internal pixel it grazes, at
-    // full opacity. A drop about one internal pixel across, drawn at an
-    // arbitrary sub-pixel position, therefore straddles a 2x2 neighbourhood
-    // and all four cells come out solid: with PIXEL_SCALE 3 that is a 6x6
-    // screen-pixel block. Shrinking it in design space barely helps, because
-    // it still straddles the grid.
-    //
-    // Snapping the column to a cell boundary and filling whole cells gives
-    // exactly one pixel of width, so the drop renders 1 cell wide instead of
-    // 2 — genuinely half the width on screen, and crisp rather than blurred
-    // into a block.
-    const k = def.frame.internalW / def.frame.designW;
-    const cell = 1 / k;
-    const colX = Math.floor(x * k) / k;
-    const headY = Math.floor(y * k) / k;
-    // Cell counts are DERIVED from design-space sizes, never hardcoded, so the
-    // drop keeps its apparent size if INTERNAL_SIZE/PIXEL_SCALE ever move
-    // again (see the note on those constants in types.ts).
-    const dropCells = Math.max(1, Math.round(ARCANE_DROP_W * k));
-    const streakCells = Math.max(1, Math.round(ARCANE_STREAK_LEN * k));
-    const w = dropCells * cell;
+    // Tail: a tapered wedge, narrow where it has come from and widening into
+    // the head, so the mote reads as travelling rather than as a bar.
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = base(def);
+    ctx.beginPath();
+    ctx.moveTo(x - 0.35, y - ARCANE_STREAK_LEN);
+    ctx.lineTo(x + 0.35, y - ARCANE_STREAK_LEN);
+    ctx.lineTo(x + ARCANE_DROP_W * 0.5, y);
+    ctx.lineTo(x - ARCANE_DROP_W * 0.5, y);
+    ctx.closePath();
+    ctx.fill();
 
-    // Trail above the head, one rung cooler so the head reads as the drop.
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = rung(def, RAMP_BASE + 1);
-    ctx.fillRect(colX, headY - streakCells * cell, w, streakCells * cell);
-
+    // Head: a four-point shard, taller than it is wide so it points the way
+    // it is going.
     ctx.globalAlpha = 1;
-    ctx.fillStyle = rung(def, RAMP_BASE + 2);
-    ctx.fillRect(colX, headY, w, w);
+    ctx.fillStyle = rung(def, RAMP_BASE + 1);
+    ctx.beginPath();
+    ctx.moveTo(x, y - ARCANE_DROP_W * 0.9);
+    ctx.lineTo(x + ARCANE_DROP_W * 0.55, y);
+    ctx.lineTo(x, y + ARCANE_DROP_W * 1.15);
+    ctx.lineTo(x - ARCANE_DROP_W * 0.55, y);
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.lineWidth = 1;
   ctx.globalAlpha = 1;
