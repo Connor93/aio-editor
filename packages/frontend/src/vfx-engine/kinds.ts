@@ -2182,10 +2182,15 @@ function drawWhirlwindFront(
 // if they fall in unison — which is also the difference from the `rain` matrix
 // kind, twelve simultaneous streaks in a square frame (drawRain, unchanged).
 
-/** Coprime with ARCANE_PHASE_STRIDE — see that constant. More motes read as
- *  denser rain at no texture cost: the effect is still four rasterised frames
- *  regardless. */
-const ARCANE_MOTES = 9;
+/** MUST be coprime with ARCANE_PHASE_STRIDE — see that constant. More motes
+ *  read as denser rain at no texture cost: the effect is still four rasterised
+ *  frames regardless.
+ *
+ *  9 was crowded; 7 is the nearest smaller count that keeps the invariants. 6
+ *  would NOT work — it shares a factor with the stride of 4, so the phase
+ *  offsets would collapse onto three distinct values and the drops would
+ *  cluster instead of scattering. Check the gcd before changing this. */
+const ARCANE_MOTES = 7;
 /** Design px above the ground point a mote starts at. Exported: guarded with
  *  ARCANE_STREAK_LEN against TALL_FRAME.groundY in
  *  scripts/vfx-registry-check.ts, mirroring WHIRLWIND_HEIGHT's guard. */
@@ -2273,7 +2278,7 @@ function drawArcaneRainBehind(
   //
   // Unlike the one-shot descents, this layer is never empty: the splash window
   // is 1 - ARCANE_FALL_FRAC of a phase (0.22) and the motes' phase offsets are
-  // spaced 1/ARCANE_MOTES apart (0.111), so at least one mote is always inside
+  // spaced 1/ARCANE_MOTES apart (0.143), so at least one mote is always inside
   // it. That is a property of those two constants — retuning either could make
   // it empty on some frames, which would be correct rather than a bug.
   ctx.fillStyle = base(def);
