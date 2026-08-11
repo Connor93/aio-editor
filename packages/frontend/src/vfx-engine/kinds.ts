@@ -788,7 +788,7 @@ function drawBurstLines(
 // the character on the two middle frames only. Jitter reuses `indexFrac` —
 // the same deterministic-scatter primitive drawChains uses for its zigzag,
 // not a new PRNG.
-const BOLT_UPPER_TOP = 120; // cy - this: where the upper fork starts
+const BOLT_UPPER_TOP = 88; // cy - this: where the upper fork starts
 const BOLT_UPPER_BOTTOM = 30; // cy - this: where the upper fork ends and
 // the lower fork picks up
 const BOLT_TRUNK_SEGMENTS = 6;
@@ -796,7 +796,38 @@ const BOLT_LOWER_SEGMENTS = 3;
 // Max horizontal jitter magnitude for the trunk/branches. Comfortably inside
 // the 62px horizontal budget by itself; branches add at most ~24px on top
 // (see drawBoltBehind), still well clear.
-const BOLT_JITTER = 9;
+const BOLT_JITTER = 6;
+
+/** Draws a straight run between two design-space points as SNAPPED whole
+ *  cells, stepping along whichever axis is longer so diagonals stay unbroken.
+ *
+ *  Lightning drawn with `stroke()` is anti-aliased, and the quantiser promotes
+ *  any pixel with roughly >=12.5% coverage to FULL alpha (see render.ts), so a
+ *  1.2-internal-px stroke does not render 1px wide — it inflates into a 2-3
+ *  cell smear, and a diagonal one smears wider still. Walking the run and
+ *  filling whole cells gives exactly `widthCells` of thickness, which is both
+ *  crisper and visibly thinner than what it replaces. */
+function boltSegment(
+  ctx: CanvasRenderingContext2D,
+  k: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  widthCells: number,
+): void {
+  const cell = 1 / k;
+  const steps = Math.max(
+    1,
+    Math.round(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * k),
+  );
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const sx = Math.floor((x0 + (x1 - x0) * t) * k) / k;
+    const sy = Math.floor((y0 + (y1 - y0) * t) * k) / k;
+    ctx.fillRect(sx, sy, widthCells * cell, cell);
+  }
+}
 
 function drawBoltBehind(
   ctx: CanvasRenderingContext2D,
@@ -812,22 +843,26 @@ function drawBoltBehind(
   const topY = cy - BOLT_UPPER_TOP;
   const bottomY = cy - BOLT_UPPER_BOTTOM;
 
-  ctx.strokeStyle = base(def);
-  ctx.lineWidth = late ? 2 : 3.5;
+  const k = def.frame.internalW / def.frame.designW;
+  const widthCells = late ? 1 : 2;
+  ctx.fillStyle = base(def);
   ctx.globalAlpha = late ? 0.35 : 1;
 
   // Main trunk: a jagged polyline from the top of the fork down to where
   // the lower fork picks up. Same zigzag idiom as drawChains — per-segment
   // jitter derived from the segment index via indexFrac, never Math.random.
-  ctx.beginPath();
-  ctx.moveTo(cx, topY);
+  // (indexFrac is fine for SPATIAL scatter like this; the aliasing trap it
+  // caused on ring-of-fire was for per-frame PHASE.)
+  let px = cx;
+  let py = topY;
   for (let s = 1; s <= BOLT_TRUNK_SEGMENTS; s++) {
     const t = s / BOLT_TRUNK_SEGMENTS;
     const y = topY + (bottomY - topY) * t;
     const jag = (indexFrac(s * 11 + 3) - 0.5) * 2 * BOLT_JITTER;
-    ctx.lineTo(cx + jag, y);
+    boltSegment(ctx, k, px, py, cx + jag, y, widthCells);
+    px = cx + jag;
+    py = y;
   }
-  ctx.stroke();
 
   // Two side branches forking off the upper trunk, diverging left/right —
   // this is what makes it read as "forked" rather than a single zigzag.
@@ -835,12 +870,18 @@ function drawBoltBehind(
     const originT = 0.3 + b * 0.3;
     const originY = topY + (bottomY - topY) * originT;
     const dir = b === 0 ? -1 : 1;
-    const reach = 14 + indexFrac(b * 13 + 5) * 10;
-    ctx.beginPath();
-    ctx.moveTo(cx, originY);
-    ctx.lineTo(cx + dir * reach, originY + reach * 0.8);
-    ctx.stroke();
+    const reach = 10 + indexFrac(b * 13 + 5) * 7;
+    boltSegment(
+      ctx,
+      k,
+      cx,
+      originY,
+      cx + dir * reach,
+      originY + reach * 0.8,
+      1,
+    );
   }
+  ctx.globalAlpha = 1;
 }
 
 function drawBoltFront(
@@ -854,29 +895,30 @@ function drawBoltFront(
   const topY = cy - BOLT_UPPER_BOTTOM; // continues where the upper fork left off
   const bottomY = cy;
 
-  ctx.strokeStyle = base(def);
-  ctx.lineWidth = late ? 2 : 3.5;
+  const k = def.frame.internalW / def.frame.designW;
+  ctx.fillStyle = base(def);
   ctx.globalAlpha = late ? 0.5 : 1;
 
   // Lower fork: continues the trunk down into the ground point. Different
   // index offsets from the upper fork's jag (s*7+40 vs s*11+3) so the two
   // halves don't look like a mechanically repeated pattern.
-  ctx.beginPath();
-  ctx.moveTo(cx, topY);
+  let px = cx;
+  let py = topY;
   for (let s = 1; s <= BOLT_LOWER_SEGMENTS; s++) {
     const t = s / BOLT_LOWER_SEGMENTS;
     const y = topY + (bottomY - topY) * t;
     const jag = (indexFrac(s * 7 + 40) - 0.5) * 2 * BOLT_JITTER;
-    ctx.lineTo(cx + jag, y);
+    boltSegment(ctx, k, px, py, cx + jag, y, late ? 1 : 2);
+    px = cx + jag;
+    py = y;
   }
-  ctx.stroke();
 
   // Ground flash: a squashed ellipse at the ground point. Absent on frame 0
   // (progress 0.125 — the bolt hasn't landed yet), then widening across
   // frames 1-3. Max rx (progress 0.875) is ~32.5, ry ~13 — both comfortably
   // inside budget.
   if (progress > 0.25) {
-    const rx = 10 + (progress - 0.25) * 36;
+    const rx = 7 + (progress - 0.25) * 24;
     const ry = rx * 0.4;
     ctx.globalAlpha = late ? 0.5 : 0.9;
     ctx.fillStyle = rung(def, RAMP_BASE + 1);
@@ -1720,20 +1762,20 @@ function drawCleaveFront(
 // Design px; the tall frame rasterises at 44/128 = 0.34375 of these, so a
 // detail needs ~6 design px to survive as 2 internal px. Every number here is
 // chosen against that, not by eye.
-const SWORDFALL_BLADE_LEN = 80;
-const SWORDFALL_BLADE_HALF_W = 6;
+const SWORDFALL_BLADE_LEN = 68;
+const SWORDFALL_BLADE_HALF_W = 5;
 /** How much of the blade's length is taper. The rest runs near-parallel — a
  *  blade that tapers along its WHOLE length is a triangle, which is what the
  *  first version drew and why it read as blocky rather than sharp. */
-const SWORDFALL_BLADE_TAPER = 24;
+const SWORDFALL_BLADE_TAPER = 20;
 /** Central ridge. ~3 design px wide = ~1 internal px, the thinnest detail that
  *  survives the raster, and the single line that most says "blade". */
 const SWORDFALL_FULLER_HALF_W = 1.5;
-const SWORDFALL_GUARD_HALF_W = 13;
-const SWORDFALL_GUARD_H = 7;
-const SWORDFALL_GRIP_H = 20;
-const SWORDFALL_GRIP_HALF_W = 3.5;
-const SWORDFALL_POMMEL_R = 4.5;
+const SWORDFALL_GUARD_HALF_W = 11;
+const SWORDFALL_GUARD_H = 6;
+const SWORDFALL_GRIP_H = 17;
+const SWORDFALL_GRIP_HALF_W = 3;
+const SWORDFALL_POMMEL_R = 4;
 
 /** Planted height above the ground point: tip at cy, pommel top at
  *  cy - SWORDFALL_TOTAL_HEIGHT. Asserted against TALL_FRAME.groundY in
@@ -1752,7 +1794,7 @@ export const SWORDFALL_TOTAL_HEIGHT =
  *  scripts/vfx-registry-check.ts; the extent assertion next to
  *  SWORDFALL_TOTAL_HEIGHT only covers the PLANTED frames, so it says
  *  nothing about the descent on its own. */
-export const SWORDFALL_START_ABOVE = 150;
+export const SWORDFALL_START_ABOVE = 128;
 const SWORDFALL_LAND_PROGRESS = 0.5;
 
 /** Tip offset above the ground point, and whether the blade has planted. */
@@ -2407,20 +2449,32 @@ function drawPoisonFront(
   cx: number,
   cy: number,
 ): void {
+  // Bubbles are drawn SNAPPED to the internal pixel grid and at near-full
+  // alpha, both for legibility.
+  //
+  // Alpha is NOT a fade in this engine. The quantiser folds coverage-and-alpha
+  // into `lum` and then picks a RUNG from it, so a bubble at alpha 0.5 does not
+  // read as a faint bubble — it reads as a dark one (see render.ts). The
+  // previous `0.9 * (1 - rise * 0.5)` fell to ~0.45 by the top of the rise,
+  // which is two rungs down, and that is why the bubbles had become hard to
+  // see. They now hold alpha 0.95 for their whole life and let the radius
+  // collapse carry the pop, which is what the eye actually reads anyway.
+  const k = def.frame.internalW / def.frame.designW;
+  const cell = 1 / k;
   for (let i = 0; i < POISON_BUBBLES; i++) {
     const b = poisonBubble(progress, i);
     if (b.r <= 0) continue;
-    ctx.globalAlpha = 0.9 * (1 - b.rise * 0.5);
-    // RAMP_BASE + 1 ("hot") once a bubble is past the pop threshold's
-    // neighbourhood, RAMP_BASE ("base") before — was `+ (2 : 1)`, but
-    // RAMP_BASE is 2 and the ramp only has 4 rungs (indices 0-3), so
-    // `RAMP_BASE + 2` clamped to the same "hot" rung as `RAMP_BASE + 1`
-    // and the bubble never actually changed colour. This makes the
-    // brighten-before-popping read for real.
-    ctx.fillStyle = rung(def, RAMP_BASE + (b.rise > 0.6 ? 1 : 0));
-    ctx.beginPath();
-    ctx.arc(cx + b.dx, cy - b.rise * POISON_RISE, b.r, 0, Math.PI * 2);
-    ctx.fill();
+    const bx = cx + b.dx;
+    const by = cy - b.rise * POISON_RISE;
+    // Whole cells, so a bubble is a crisp 1-2px blob rather than an
+    // anti-aliased smear promoted to a larger solid block by the quantiser.
+    const cells = Math.max(1, Math.round(b.r * 2 * k));
+    const span = cells * cell;
+    const x0 = Math.floor((bx - span / 2) * k) / k;
+    const y0 = Math.floor((by - span / 2) * k) / k;
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = rung(def, RAMP_BASE + 1);
+    ctx.fillRect(x0, y0, span, span);
   }
   ctx.globalAlpha = 1;
 }

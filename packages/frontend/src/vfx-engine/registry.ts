@@ -175,7 +175,12 @@ const SET_PIECES: Record<SetPieceName, SetPieceConfig> = {
     frame: TALL_FRAME,
     frames: 4,
     loops: 1,
-    frameMs: 100,
+    // 150ms, not the 100 every other set piece uses: the descent read as too
+    // quick to follow. That makes a cycle 600ms and moves the blade's plant
+    // from 200ms to 300ms after the damage number — a deliberate trade of
+    // impact sync for legibility, asserted explicitly in
+    // scripts/vfx-registry-check.ts rather than allowed to drift.
+    frameMs: 150,
     hasCycles: true,
     cycleMode: 'loop',
   },
