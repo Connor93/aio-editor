@@ -25,6 +25,16 @@
       "description": "Status flipped by a toggle skill." },
     "cast_vfx": { "type": "string", "x-aio-suggest": [] },
     "impact_vfx": { "type": "string", "x-aio-suggest": [] },
+    "class_requirement": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Class allowed to learn this skill; 0 = any class.",
+      "x-aio-ref": { "type": "classes", "noneLabel": "(any class)" }
+    },
+    "min_level": { "type": "integer", "minimum": 0, "default": 0,
+      "description": "Minimum character level required to learn this skill." },
+    "skill_point_cost": { "type": "integer", "minimum": 0, "default": 0,
+      "description": "Skill points deducted from the character's pool when learning this skill." },
     "actions": { "type": "array", "items": { "$ref": "#/definitions/skillAction" } }
   },
   "definitions": {
