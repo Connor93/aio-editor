@@ -88,8 +88,25 @@ export interface VfxDef {
 //                 canvas) actually sees. Was 128; now 132, since 128 doesn't
 //                 factor into an integer multiple of a sensible INTERNAL_SIZE.
 export const DESIGN_SIZE = 128;
-export const INTERNAL_SIZE = 44;
-export const PIXEL_SCALE = 3;
+// 132 x 1, not the original 44 x 3. The game's own world sprites — characters,
+// NPCs, tiles — render at scale 1, i.e. one art pixel per screen pixel. At
+// 44 x 3 an effect's smallest expressible detail was THREE screen pixels, so
+// effects read as markedly blockier than everything they were drawn over. The
+// output frame is unchanged at 132px either way (FRAME_SIZE below), so this
+// costs no texture memory — only a larger internal raster to quantise, once
+// per effect, cached thereafter.
+//
+// The 4-rung quantisation is deliberately kept: effects still have flat,
+// stylised colour rather than smooth gradients. What changes is the size of
+// the pixel, not the palette.
+//
+// Anything drawn in whole raster cells (the pixel-snapped details in kinds.ts)
+// must derive its cell count from a DESIGN-space size via the frame's own
+// internalW/designW ratio, never a hardcoded cell count — otherwise it silently
+// changes apparent size whenever these constants move, which is exactly what
+// this edit would have done to them.
+export const INTERNAL_SIZE = 132;
+export const PIXEL_SCALE = 1;
 export const FRAME_SIZE = INTERNAL_SIZE * PIXEL_SCALE;
 
 // ── Per-def frame geometry ──────────────────────────────────────────────

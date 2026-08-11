@@ -797,6 +797,11 @@ const BOLT_LOWER_SEGMENTS = 3;
 // the 62px horizontal budget by itself; branches add at most ~24px on top
 // (see drawBoltBehind), still well clear.
 const BOLT_JITTER = 6;
+/** Bolt thickness in DESIGN px (early / late in the strike), converted to
+ *  whole cells at draw time — see ARCANE_DROP_W for why these are not cell
+ *  counts. */
+const BOLT_W_EARLY = 6;
+const BOLT_W_LATE = 3;
 
 /** Draws a straight run between two design-space points as SNAPPED whole
  *  cells, stepping along whichever axis is longer so diagonals stay unbroken.
@@ -844,7 +849,10 @@ function drawBoltBehind(
   const bottomY = cy - BOLT_UPPER_BOTTOM;
 
   const k = def.frame.internalW / def.frame.designW;
-  const widthCells = late ? 1 : 2;
+  const widthCells = Math.max(
+    1,
+    Math.round((late ? BOLT_W_LATE : BOLT_W_EARLY) * k),
+  );
   ctx.fillStyle = base(def);
   ctx.globalAlpha = late ? 0.35 : 1;
 
@@ -896,6 +904,10 @@ function drawBoltFront(
   const bottomY = cy;
 
   const k = def.frame.internalW / def.frame.designW;
+  const boltWidthCells = Math.max(
+    1,
+    Math.round((late ? BOLT_W_LATE : BOLT_W_EARLY) * k),
+  );
   ctx.fillStyle = base(def);
   ctx.globalAlpha = late ? 0.5 : 1;
 
@@ -908,7 +920,7 @@ function drawBoltFront(
     const t = s / BOLT_LOWER_SEGMENTS;
     const y = topY + (bottomY - topY) * t;
     const jag = (indexFrac(s * 7 + 40) - 0.5) * 2 * BOLT_JITTER;
-    boltSegment(ctx, k, px, py, cx + jag, y, late ? 1 : 2);
+    boltSegment(ctx, k, px, py, cx + jag, y, boltWidthCells);
     px = cx + jag;
     py = y;
   }
@@ -2151,6 +2163,9 @@ const ARCANE_FALL_FRAC = 0.78;
 /** Length of the front layer's motion streak trailing above a falling mote;
  *  stacks on ARCANE_START_ABOVE for the worst-case above-cy extent. Exported
  *  for the same guard as ARCANE_START_ABOVE. */
+/** Width of a raindrop in DESIGN px; converted to whole cells at draw time
+ *  so its on-screen size survives a change to the raster resolution. */
+const ARCANE_DROP_W = 3;
 export const ARCANE_STREAK_LEN = 6;
 
 /** Where mote `i` is: how far through its fall, or how old its splash is.
@@ -2308,16 +2323,21 @@ function drawArcaneRainFront(
     const cell = 1 / k;
     const colX = Math.floor(x * k) / k;
     const headY = Math.floor(y * k) / k;
+    // Cell counts are DERIVED from design-space sizes, never hardcoded, so the
+    // drop keeps its apparent size if INTERNAL_SIZE/PIXEL_SCALE ever move
+    // again (see the note on those constants in types.ts).
+    const dropCells = Math.max(1, Math.round(ARCANE_DROP_W * k));
     const streakCells = Math.max(1, Math.round(ARCANE_STREAK_LEN * k));
+    const w = dropCells * cell;
 
     // Trail above the head, one rung cooler so the head reads as the drop.
     ctx.globalAlpha = 0.7;
     ctx.fillStyle = rung(def, RAMP_BASE + 1);
-    ctx.fillRect(colX, headY - streakCells * cell, cell, streakCells * cell);
+    ctx.fillRect(colX, headY - streakCells * cell, w, streakCells * cell);
 
     ctx.globalAlpha = 1;
     ctx.fillStyle = rung(def, RAMP_BASE + 2);
-    ctx.fillRect(colX, headY, cell, cell);
+    ctx.fillRect(colX, headY, w, w);
   }
   ctx.lineWidth = 1;
   ctx.globalAlpha = 1;
