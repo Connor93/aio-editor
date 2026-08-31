@@ -40,83 +40,83 @@ echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 docker push "$BACKEND_IMAGE"
 docker push "$FRONTEND_IMAGE"
 
-# ── GFX preview assets (one-time seed of the origin-gfx volume) ──
-# The editor serves preview PNGs from GFX_ROOT/gfxNNN/<resource_id>.png.
-# Set GFX_SRC in .env.deploy (path to reoserv/data/gfx) to upload the four
-# needed dirs (~30M) into origin-gfx once. Skipped if already populated.
-if [[ -n "${GFX_SRC:-}" ]]; then
-  if [[ ! -d "$GFX_SRC/gfx023" ]]; then
-    echo "⚠️  GFX_SRC=$GFX_SRC has no gfx023/ — skipping GFX seed (check the path)"
-  else
-    GFX_STATE=$(ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
-      "docker run --rm -v origin-gfx:/v alpine sh -c '[ -d /v/gfx023 ] && echo filled || echo empty'")
-    if [[ "$GFX_STATE" == "empty" ]]; then
-      echo "🎨 Seeding origin-gfx from $GFX_SRC (one-time, ~30M) ..."
-      tar -C "$GFX_SRC" -czf /tmp/origin-gfx.tgz gfx021 gfx023 gfx024 gfx025
-      scp -P "$SSH_PORT" /tmp/origin-gfx.tgz "${VPS_USER}@${VPS_HOST}:/tmp/origin-gfx.tgz"
-      ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
-        "docker run --rm -v origin-gfx:/v -v /tmp/origin-gfx.tgz:/seed.tgz:ro alpine sh -c 'tar -xzf /seed.tgz -C /v' && rm -f /tmp/origin-gfx.tgz"
-      rm -f /tmp/origin-gfx.tgz
-      echo "🎨 origin-gfx seeded."
-    else
-      echo "🎨 origin-gfx already populated — skipping seed (clear the volume to re-seed)."
-    fi
-  fi
-fi
+# ── GFX assets → origin-gfx (content-addressed) ──
+# The editor serves preview PNGs from GFX_ROOT/gfxNNN/<resource_id>.png, and the
+# embedded eomap-js loads the map .egf files straight out of the same volume.
+#
+# Each block hashes its sources and parks the digest in the volume as
+# .seed-<name>.stamp, so a deploy re-uploads exactly when the content changed.
+# These guards used to key on mere path presence ("is gfx023/ there?"), which
+# meant every gfx update after the very first seed was silently skipped and prod
+# quietly kept serving the old art. Set GFX_SRC in .env.deploy (path to
+# reoserv/data/gfx) to enable; unset skips the whole section.
 
-# ── Worn-graphic preview dirs (one-time seed of origin-gfx) ──
-# The worn-graphic picker for equippable `spec1` serves the on-character sprite
-# sheets, which the first seed above never shipped: gfx017 (weapon), gfx019
-# (shield), gfx013 (armor), gfx015 (hat), gfx011 (boots) — the male sheets the
-# backend's worn_* categories reference. Kept as its own block (keyed on gfx017,
-# not gfx023) so it back-fills volumes seeded before these categories existed.
-if [[ -n "${GFX_SRC:-}" ]]; then
-  if [[ ! -d "$GFX_SRC/gfx017" ]]; then
-    echo "⚠️  GFX_SRC=$GFX_SRC has no gfx017/ — skipping worn-graphic seed (check the path)"
-  else
-    WORN_STATE=$(ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
-      "docker run --rm -v origin-gfx:/v alpine sh -c '[ -d /v/gfx017 ] && echo filled || echo empty'")
-    if [[ "$WORN_STATE" == "empty" ]]; then
-      echo "🧥 Seeding worn-graphic dirs into origin-gfx (gfx011/013/015/017/019) ..."
-      tar -C "$GFX_SRC" -czf /tmp/origin-worn.tgz gfx011 gfx013 gfx015 gfx017 gfx019
-      scp -P "$SSH_PORT" /tmp/origin-worn.tgz "${VPS_USER}@${VPS_HOST}:/tmp/origin-worn.tgz"
-      ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
-        "docker run --rm -v origin-gfx:/v -v /tmp/origin-worn.tgz:/seed.tgz:ro alpine sh -c 'tar -xzf /seed.tgz -C /v' && rm -f /tmp/origin-worn.tgz"
-      rm -f /tmp/origin-worn.tgz
-      echo "🧥 origin-gfx worn-graphic dirs seeded."
-    else
-      echo "🧥 Worn-graphic dirs already present in origin-gfx — skipping."
-    fi
-  fi
-fi
+# Deterministic digest of the given paths' file contents, relative to GFX_SRC.
+# Filenames here are `<digits>.png` / `gfxNNN.egf[.br]`, so newline-separated
+# listing is safe (BSD sort has no -z).
+gfx_fingerprint() {
+  ( cd "$GFX_SRC" && find "$@" -type f \
+      | LC_ALL=C sort \
+      | xargs shasum -a 256 \
+      | shasum -a 256 \
+      | cut -d' ' -f1 )
+}
 
-# ── Map EGF files + brotli precompression (one-time seed for the editor) ──
-# eomap-js connected mode needs gfx003/004/005/006/007/022.egf in origin-gfx.
-# We also ship .egf.br siblings so the backend serves them with
-# Content-Encoding: br (~108MB -> ~5MB first-load transfer; the loader is
-# untouched — the browser decompresses transparently). The PNG seed above only
-# ships the gfxNNN/ preview dirs. Idempotent: keyed on gfx003.egf.br present.
-if [[ -n "${GFX_SRC:-}" ]]; then
-  if [[ ! -f "$GFX_SRC/gfx003.egf" ]]; then
-    echo "⚠️  GFX_SRC=$GFX_SRC has no gfx003.egf — skipping map EGF seed"
-  else
-    EGF_STATE=$(ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
-      "docker run --rm -v origin-gfx:/v alpine sh -c '[ -f /v/gfx003.egf.br ] && echo filled || echo empty'")
-    if [[ "$EGF_STATE" == "empty" ]]; then
-      echo "🗺️  Seeding map EGFs (+ brotli) into origin-gfx ..."
-      "$SCRIPT_DIR/scripts/compress-egf.sh" "$GFX_SRC"
-      tar -C "$GFX_SRC" -czf /tmp/origin-egf.tgz \
-        gfx003.egf gfx004.egf gfx005.egf gfx006.egf gfx007.egf gfx022.egf \
-        gfx003.egf.br gfx004.egf.br gfx005.egf.br gfx006.egf.br gfx007.egf.br gfx022.egf.br
-      scp -P "$SSH_PORT" /tmp/origin-egf.tgz "${VPS_USER}@${VPS_HOST}:/tmp/origin-egf.tgz"
-      ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
-        "docker run --rm -v origin-gfx:/v -v /tmp/origin-egf.tgz:/seed.tgz:ro alpine sh -c 'tar -xzf /seed.tgz -C /v' && rm -f /tmp/origin-egf.tgz"
-      rm -f /tmp/origin-egf.tgz
-      echo "🗺️  Map EGFs + .br seeded."
-    else
-      echo "🗺️  Map EGFs already present in origin-gfx — skipping."
+# seed_gfx <label> <stamp-name> <path>...
+seed_gfx() {
+  local label="$1" stamp="$2"; shift 2
+  local paths=("$@") p want have
+
+  for p in "${paths[@]}"; do
+    if [[ ! -e "$GFX_SRC/$p" ]]; then
+      echo "⚠️  GFX_SRC=$GFX_SRC has no $p — skipping $label seed (check the path)"
+      return 0
     fi
+  done
+
+  want=$(gfx_fingerprint "${paths[@]}")
+  have=$(ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
+    "docker run --rm -v origin-gfx:/v alpine cat /v/.seed-${stamp}.stamp 2>/dev/null" || true)
+  have="${have//[$'\r\n']/}"
+
+  if [[ "$want" == "$have" ]]; then
+    echo "✅ $label unchanged in origin-gfx — skipping."
+    return 0
   fi
+
+  if [[ -n "$have" ]]; then
+    echo "🔄 $label changed (${have:0:12} → ${want:0:12}) — re-seeding ..."
+  else
+    echo "🎨 Seeding $label into origin-gfx (first time) ..."
+  fi
+
+  tar -C "$GFX_SRC" -czf "/tmp/origin-${stamp}.tgz" "${paths[@]}"
+  echo "   $(du -h "/tmp/origin-${stamp}.tgz" | cut -f1) → ${VPS_HOST}"
+  scp -P "$SSH_PORT" "/tmp/origin-${stamp}.tgz" "${VPS_USER}@${VPS_HOST}:/tmp/origin-${stamp}.tgz"
+  ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" \
+    "docker run --rm -v origin-gfx:/v -v /tmp/origin-${stamp}.tgz:/seed.tgz:ro alpine \
+       sh -c 'tar -xzf /seed.tgz -C /v && printf %s \"${want}\" > /v/.seed-${stamp}.stamp' \
+     && rm -f /tmp/origin-${stamp}.tgz"
+  rm -f "/tmp/origin-${stamp}.tgz"
+  echo "✅ $label seeded."
+}
+
+if [[ -n "${GFX_SRC:-}" ]]; then
+  # Preview PNGs behind the item / NPC / spell / spell-icon pickers.
+  seed_gfx "GFX previews" previews gfx021 gfx023 gfx024 gfx025
+
+  # Worn-graphic (item.spec1) sheets. Male sheets are canonical — spec1 is
+  # gender-agnostic, so the worn_* categories only ever read these.
+  seed_gfx "worn-graphic dirs" worn gfx011 gfx013 gfx015 gfx017 gfx019
+
+  # Map EGFs for the embedded editor, plus brotli siblings the backend serves
+  # with Content-Encoding: br. Refresh the .br first so it's part of the digest.
+  if [[ -f "$GFX_SRC/gfx003.egf" ]]; then
+    "$SCRIPT_DIR/scripts/compress-egf.sh" "$GFX_SRC"
+  fi
+  seed_gfx "map EGFs" mapegf \
+    gfx003.egf gfx004.egf gfx005.egf gfx006.egf gfx007.egf gfx022.egf \
+    gfx003.egf.br gfx004.egf.br gfx005.egf.br gfx006.egf.br gfx007.egf.br gfx022.egf.br
 fi
 
 ssh -p "$SSH_PORT" "${VPS_USER}@${VPS_HOST}" bash -s -- \
