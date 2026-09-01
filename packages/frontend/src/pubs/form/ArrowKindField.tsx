@@ -8,6 +8,14 @@ import {
   drawArrowCanvas,
 } from "../../vfx-engine";
 
+// STYLING NOTE: this form is styled with explicit Tailwind `slate-*` colours.
+// aio-editor's frontend does NOT use daisyUI, so semantic tokens like
+// `border-primary` / `border-base-300` / `bg-base-300` emit NO CSS here — an
+// earlier version of this picker used them and the selected state was
+// therefore completely invisible: clicking a shape changed the value but
+// nothing on screen moved. Selected-tile styling below matches VfxField's
+// established convention (border-slate-100 + ring-2).
+//
 // Mirrors VfxField: a gallery of live previews rather than a dropdown, because
 // the entire point is seeing the flaming arrow before choosing it.
 
@@ -47,7 +55,7 @@ function ShapePreview({ shapeId }: { shapeId: string }) {
       ref={ref}
       width={ARROW_CANVAS_SIZE * PREVIEW_SCALE}
       height={ARROW_CANVAS_SIZE * PREVIEW_SCALE}
-      className="bg-base-300 rounded"
+      className="rounded bg-slate-900"
     />
   );
 }
@@ -67,13 +75,21 @@ export function ArrowKindPicker({
           key={id}
           type="button"
           onClick={() => onChange(id === DEFAULT_ARROW_SHAPE ? "" : id)}
-          className={`flex flex-col items-center gap-1 rounded border p-1 ${
-            current === id ? "border-primary" : "border-base-300"
+          className={`flex flex-col items-center gap-1 rounded border p-1 transition ${
+            current === id
+              ? "border-slate-100 bg-slate-700 ring-2 ring-slate-400/70"
+              : "border-slate-600 hover:border-slate-400"
           }`}
           title={`${id} (default element: ${ARROW_SHAPES[id]!.defaultElement})`}
         >
           <ShapePreview shapeId={id} />
-          <span className="font-mono text-xs">{id}</span>
+          <span
+            className={`font-mono text-xs ${
+              current === id ? "text-slate-100" : "text-slate-400"
+            }`}
+          >
+            {id}
+          </span>
         </button>
       ))}
     </div>
