@@ -57,6 +57,8 @@ export interface ArrowShapeDef {
   lengthScale: number;
   headScale: number;
   shaftScale: number;
+  /** Absent = this shape sheds nothing. */
+  trail?: ArrowTrailKind;
 }
 
 /** The unauthored default shape, pulled out to a standalone const rather than
@@ -87,6 +89,7 @@ export const ARROW_SHAPES: Record<string, ArrowShapeDef> = {
     lengthScale: 1,
     headScale: 1.15,
     shaftScale: 1,
+    trail: 'embers',
   },
   frost: {
     id: 'frost',
@@ -95,6 +98,7 @@ export const ARROW_SHAPES: Record<string, ArrowShapeDef> = {
     lengthScale: 1,
     headScale: 1.1,
     shaftScale: 1,
+    trail: 'frost',
   },
   bolt: {
     id: 'bolt',
@@ -120,6 +124,7 @@ export const ARROW_SHAPES: Record<string, ArrowShapeDef> = {
     lengthScale: 0.95,
     headScale: 1.2,
     shaftScale: 0.8,
+    trail: 'wisp',
   },
 };
 
@@ -143,6 +148,59 @@ const ARROW_SHAPE_KEYS: ReadonlySet<string> = new Set(
 export function isArrowShapeId(id: string): boolean {
   return ARROW_SHAPE_KEYS.has(id);
 }
+
+/** What a shape sheds as it flies. A trail is a property OF THE SHAPE, so it
+ *  needs nothing new on the wire — the shape id already carries it. */
+export type ArrowTrailKind = 'embers' | 'frost' | 'wisp';
+
+export interface ArrowTrailDef {
+  kind: ArrowTrailKind;
+  /** How long one mote lives, ms. */
+  lifeMs: number;
+  /** Emit one mote per this many ms of flight. lifeMs / emitMs is roughly the
+   *  live-mote budget per arrow — keep the product under ~12. */
+  emitMs: number;
+  /** Per-ms drift in SCREEN space. Negative y drifts upward. */
+  driftX: number;
+  driftY: number;
+  /** Mote canvas edge, px. */
+  size: number;
+  /** How far a mote is offset off the flight line at birth, px. */
+  spread: number;
+}
+
+/** Keyed by a CLOSED union, so this compiles to concrete properties and is NOT
+ *  subject to noUncheckedIndexedAccess — unlike ARROW_SHAPES, which is keyed by
+ *  authored text and needs the isArrowShapeId guard. */
+export const ARROW_TRAILS: Record<ArrowTrailKind, ArrowTrailDef> = {
+  embers: {
+    kind: 'embers',
+    lifeMs: 260,
+    emitMs: 28,
+    driftX: 0.004,
+    driftY: -0.02,
+    size: 6,
+    spread: 1.6,
+  },
+  frost: {
+    kind: 'frost',
+    lifeMs: 300,
+    emitMs: 34,
+    driftX: 0,
+    driftY: 0.01,
+    size: 5,
+    spread: 2.2,
+  },
+  wisp: {
+    kind: 'wisp',
+    lifeMs: 340,
+    emitMs: 40,
+    driftX: 0,
+    driftY: -0.006,
+    size: 7,
+    spread: 1.2,
+  },
+};
 
 /** The four iso diagonals in SCREEN space, in the order arrowFacingIndex
  *  buckets them: down-right, down-left, up-right, up-left.
@@ -365,5 +423,69 @@ export function drawArrowCanvas(
   head();
   ctx.fill();
 
+  return canvas;
+}
+
+/** Deterministic per-mote offset. The engine NEVER calls Math.random():
+ *  output must be reproducible so the editor's preview matches the game
+ *  exactly. Golden-angle stepping gives a spread that does not visibly
+ *  repeat — the same trick spark-burst uses in kinds.ts. */
+export function moteJitter(index: number): { x: number; y: number } {
+  const angle = index * 2.399963;
+  return { x: Math.cos(angle), y: Math.sin(angle) };
+}
+
+/** One trail mote, drawn from the same element ramp as the arrow so a trail
+ *  scales to all 7 elements for free. Returns a canvas; the caller owns
+ *  wrapping it (eoweb into a Pixi texture, the editor via drawImage). */
+export function drawMoteCanvas(
+  kind: ArrowTrailKind,
+  element: ElementKey,
+): HTMLCanvasElement {
+  const def = ARROW_TRAILS[kind];
+  const ramp: Ramp = ELEMENTS[element];
+  const size = def.size;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  ctx.imageSmoothingEnabled = false;
+
+  const c = size / 2;
+  switch (kind) {
+    case 'embers': {
+      // Hot core, cooler rim — reads as a spark rather than a dot.
+      ctx.fillStyle = hex(ramp[1]);
+      ctx.beginPath();
+      ctx.arc(c, c, c - 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = hex(ramp[3]);
+      ctx.beginPath();
+      ctx.arc(c, c, Math.max(1, c - 2), 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'frost': {
+      // A hard little diamond — crystalline, not a blob.
+      ctx.fillStyle = hex(ramp[2]);
+      ctx.beginPath();
+      ctx.moveTo(c, 0);
+      ctx.lineTo(size, c);
+      ctx.lineTo(c, size);
+      ctx.lineTo(0, c);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'wisp': {
+      // Soft and dim: a smear rather than a point.
+      ctx.fillStyle = hex(ramp[1]);
+      ctx.beginPath();
+      ctx.ellipse(c, c, c - 0.5, Math.max(1, c - 2), 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
   return canvas;
 }
