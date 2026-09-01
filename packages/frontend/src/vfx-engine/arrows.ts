@@ -59,17 +59,27 @@ export interface ArrowShapeDef {
   shaftScale: number;
 }
 
+/** The unauthored default shape, pulled out to a standalone const rather than
+ *  read back off `ARROW_SHAPES.plain`: a dotted access on a
+ *  `Record<string, T>` still goes through the index signature and stays
+ *  `T | undefined` under a consumer's `noUncheckedIndexedAccess` (aio-editor
+ *  sets it; eoweb does not — the vendored engine must compile under the
+ *  STRICTEST consumer's tsconfig, and eoweb's own gates cannot prove that). A
+ *  standalone `ArrowShapeDef`-typed const has no index signature to go
+ *  through, so it is provably defined with no non-null assertion needed. */
+const PLAIN_ARROW_SHAPE: ArrowShapeDef = {
+  id: 'plain',
+  defaultElement: 'neutral',
+  head: 'triangle',
+  lengthScale: 1,
+  headScale: 1,
+  shaftScale: 1,
+};
+
 /** The catalog. Task 3 adds the rest; `plain` is the unauthored default and
  *  must always exist. */
 export const ARROW_SHAPES: Record<string, ArrowShapeDef> = {
-  plain: {
-    id: 'plain',
-    defaultElement: 'neutral',
-    head: 'triangle',
-    lengthScale: 1,
-    headScale: 1,
-    shaftScale: 1,
-  },
+  plain: PLAIN_ARROW_SHAPE,
 };
 
 export const DEFAULT_ARROW_SHAPE = 'plain';
@@ -207,9 +217,18 @@ export function drawArrowCanvas(
   // a crash). Same for 'toString', 'valueOf', '__proto__'. This exact trap
   // has already broken the AIO editor form once. See ARROW_SHAPE_KEYS for why
   // this can't be Object.hasOwn or Object.prototype.hasOwnProperty.call.
-  const shape = isArrowShapeId(shapeId)
-    ? ARROW_SHAPES[shapeId]
-    : ARROW_SHAPES[DEFAULT_ARROW_SHAPE];
+  //
+  // The explicit `: undefined` (rather than falling through to
+  // `ARROW_SHAPES[DEFAULT_ARROW_SHAPE]`) is what lets the `??` below narrow
+  // `shape` to a definite ArrowShapeDef with NO non-null assertion: under
+  // noUncheckedIndexedAccess, `ARROW_SHAPES[shapeId]` is always
+  // `ArrowShapeDef | undefined` no matter how it's guarded, because the guard
+  // is a runtime check TS can't fold into the index-signature type. Only a
+  // `??` against a standalone-typed const (PLAIN_ARROW_SHAPE) removes the
+  // `undefined` for real.
+  const shape =
+    (isArrowShapeId(shapeId) ? ARROW_SHAPES[shapeId] : undefined) ??
+    PLAIN_ARROW_SHAPE;
   // No `??` here: `element` is the closed ElementKey union, so the lookup is
   // always defined and a fallback would be dead code.
   const ramp: Ramp = ELEMENTS[element];
