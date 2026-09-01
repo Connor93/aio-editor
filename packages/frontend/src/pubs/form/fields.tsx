@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useRefs } from "../refs/RefsContext";
+import { ArrowKindPicker } from "./ArrowKindField";
 import { type JsonSchema, makeDefault, resolveRef } from "./schema";
 import { ICON_SUGGESTIONS } from "./suggest-values";
 import { VfxField } from "./VfxField";
@@ -49,6 +50,10 @@ export function SchemaField(props: CommonProps) {
       return <VfxSuggestField {...props} schema={resolved} />;
     }
     return <SuggestField {...props} schema={resolved} />;
+  }
+
+  if (isArrowKindPath(props.path)) {
+    return <ArrowKindSuggestField {...props} schema={resolved} />;
   }
 
   if (resolved["x-aio-display"]?.kind === "percent") {
@@ -1312,6 +1317,12 @@ function isVfxPath(path: string): boolean {
   return path.endsWith("cast_vfx") || path.endsWith("impact_vfx");
 }
 
+/** True for `arrow_kind` leaf fields, routed to ArrowKindSuggestField below
+ *  instead of the plain string input. */
+function isArrowKindPath(path: string): boolean {
+  return path.endsWith("arrow_kind");
+}
+
 /** Resolves the vendored suggestion list for a field from its path when the
  *  schema doesn't supply an explicit `x-aio-suggest` list (i.e. the schema
  *  only marks the field with an empty `[]` to route it here). Paths look
@@ -1366,6 +1377,28 @@ function VfxSuggestField({ schema, value, onChange, path, label, required, compa
         compact={compact}
       />
       <VfxField
+        value={typeof value === "string" ? value : ""}
+        onChange={(next) => onChange(next)}
+      />
+    </div>
+  );
+}
+
+/** `arrow_kind`. A plain <div>, not a <label>, for the same reason as
+ *  VfxSuggestField: ArrowKindPicker renders several controls, and a single
+ *  <label> wrapping all of them would associate the caption with whichever
+ *  one the browser picks. */
+function ArrowKindSuggestField({ schema, value, onChange, path, label, required, compact }: CommonProps) {
+  return (
+    <div className="group/field block">
+      <FieldLabel
+        label={label}
+        required={required}
+        description={schema.description}
+        path={path}
+        compact={compact}
+      />
+      <ArrowKindPicker
         value={typeof value === "string" ? value : ""}
         onChange={(next) => onChange(next)}
       />

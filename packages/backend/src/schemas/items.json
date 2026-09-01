@@ -18,7 +18,7 @@
     },
     {
       "label": "Combat",
-      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage", "attack_rate_ms", "range"]
+      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage", "attack_rate_ms", "range", "arrow_kind"]
     },
     {
       "label": "Character Stats",
@@ -117,6 +117,10 @@
       "type": "integer",
       "minimum": 1,
       "description": "Weapons only: attack range in tiles (melee = 1, bow ~5). Omit to use the default (melee, or the server's weapon_ranges config fallback). Note: the 'requires arrows' rule still lives in the server's weapon_ranges config, not here."
+    },
+    "arrow_kind": {
+      "type": "string",
+      "description": "Bows only: what this weapon's arrows look like. The arrow is coloured by the weapon's rolled element when it has one, otherwise by the shape's own default element. Leave empty for a plain arrow."
     },
     "str": { "type": "integer" },
     "intl": { "type": "integer" },
