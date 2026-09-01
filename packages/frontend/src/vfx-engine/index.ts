@@ -3,6 +3,7 @@
 // no imports from outside this directory, so it can be vendored verbatim
 // into another repository.
 
+export * from './arrows';
 export * from './kinds';
 export * from './palette';
 export * from './registry';
