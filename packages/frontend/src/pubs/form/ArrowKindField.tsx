@@ -43,15 +43,46 @@ const UY = FACING.dy / FACING_LEN;
 // Static canvas, so no trail can literally animate — instead the preview
 // freezes the arrow mid-flight with its motes already laid out behind it
 // (see the loop below), which reads as a trail with zero rAF.
+
+// Geometry of the frozen-pose loop below: TRAIL_STEPS motes are laid back
+// along the flight line, MOTE_STEP_PX design-px apart per step. Hoisted to
+// module scope (rather than left as locals inside the loop) so the
+// TRAIL_MARGIN derivation right below can reference the exact same numbers
+// the loop draws with — two independent copies of "7" and "5" could drift
+// apart silently.
+const TRAIL_STEPS = 7;
+const MOTE_STEP_PX = 5;
+
+// TRAIL_MARGIN is DERIVED from ARROW_TRAILS, not hand-tuned, so a later
+// retune of spread/drift/lifeMs can never silently clip the preview —
+// Canvas2D draws off-canvas with no error or warning. For each trail kind,
+// the worst-case distance a mote can land from the arrow's centre is the sum
+// of:
+//   - how far back along the flight line the LAST mote in the frozen pose
+//     sits: (TRAIL_STEPS - 1) * MOTE_STEP_PX design px. Exact, not a bound —
+//     UX/UY (the loop's travel unit vector) has magnitude 1.
+//   - its spread jitter: exactly `spread`, since moteJitter always returns a
+//     unit vector, so `(j.x * spread, j.y * spread)` has magnitude `spread`.
+//   - its drift, generously bounded by a FULL lifeMs of accumulated drift
+//     (hypot(driftX, driftY) * lifeMs) — looser than the loop's actual oldest
+//     mote, which is aged only (TRAIL_STEPS - 1) / TRAIL_STEPS of lifeMs, on
+//     purpose, for headroom.
+// These three offsets don't necessarily point the same way, so summing their
+// magnitudes is a safe (if slightly loose) upper bound on the true worst
+// case. +4px pad on top, then round up.
 //
-// Room reserved behind the arrow for that frozen trail, in design px (i.e.
-// before PREVIEW_SCALE). Worst case across all three ARROW_TRAILS kinds and
-// all `steps` mote ages, the backward offset a mote can reach is ~27.4px
-// along x and ~16.3px along y (checked numerically against the loop's own
-// formula) — 20 leaves a comfortable margin without the canvas ballooning.
 // ARROW_CANVAS_SIZE itself is untouched: it's the game's sprite size, and
 // changing it would shift every arrow's centre in the actual game.
-const TRAIL_MARGIN = 20;
+const TRAIL_MARGIN = Math.ceil(
+  Math.max(
+    ...Object.values(ARROW_TRAILS).map(
+      (def) =>
+        (TRAIL_STEPS - 1) * MOTE_STEP_PX +
+        def.spread +
+        Math.hypot(def.driftX, def.driftY) * def.lifeMs,
+    ),
+  ) + 4,
+);
 const PREVIEW_CANVAS_SIZE = ARROW_CANVAS_SIZE + TRAIL_MARGIN;
 
 function ShapePreview({ shapeId }: { shapeId: string }) {
@@ -98,14 +129,15 @@ function ShapePreview({ shapeId }: { shapeId: string }) {
       // A frozen mid-flight pose: motes laid back along the reverse of the
       // travel direction, each aged a little more than the one ahead of it,
       // so the fade and the drift both read without any animation.
-      const steps = 7;
-      for (let i = 0; i < steps; i++) {
-        const t = i / steps;
+      for (let i = 0; i < TRAIL_STEPS; i++) {
+        const t = i / TRAIL_STEPS;
         const ageMs = t * def.lifeMs;
         const j = moteJitter(i);
         // Back along the flight line, plus this mote's accumulated drift.
-        const bx = -UX * (i * 5) + j.x * def.spread + def.driftX * ageMs;
-        const by = -UY * (i * 5) + j.y * def.spread + def.driftY * ageMs;
+        const bx =
+          -UX * (i * MOTE_STEP_PX) + j.x * def.spread + def.driftX * ageMs;
+        const by =
+          -UY * (i * MOTE_STEP_PX) + j.y * def.spread + def.driftY * ageMs;
         ctx.globalAlpha = Math.max(0, 1 - t * t);
         ctx.drawImage(mote, originX + bx, originY + by);
       }
