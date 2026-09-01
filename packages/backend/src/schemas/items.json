@@ -120,6 +120,7 @@
     },
     "arrow_kind": {
       "type": "string",
+      "maxLength": 64,
       "description": "Bows only: what this weapon's arrows look like. The arrow is coloured by the weapon's rolled element when it has one, otherwise by the shape's own default element. Leave empty for a plain arrow."
     },
     "str": { "type": "integer" },

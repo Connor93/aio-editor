@@ -15,6 +15,12 @@ const PREVIEW_SCALE = 2;
 // Down-right, the facing that reads most clearly at a glance. arrowFacings
 // always returns exactly 4 entries (see its doc comment), so index 0 is safe;
 // the `!` is only to satisfy noUncheckedIndexedAccess.
+//
+// 32/16 are the iso half-tile width/height. The editor can't import eoweb's
+// consts.ts, so these are hardcoded rather than derived from
+// HALF_TILE_WIDTH/HALF_TILE_HEIGHT — only their 2:1 ratio matters for this
+// preview, but if the tile size ever changes there, this will silently drift
+// out of sync.
 const FACING = arrowFacings(32, 16)[0]!;
 
 function ShapePreview({ shapeId }: { shapeId: string }) {
