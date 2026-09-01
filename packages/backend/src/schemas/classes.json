@@ -2,10 +2,12 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://aio-editor/schemas/classes.json",
   "title": "Class",
-  "description": "REOSERV data/pub/classes/<id>.json — one EcfRecord per file. See src/utils/load_class_file.rs.",
+  "description": "REOSERV data/pub/classes/<id>.json \u2014 one EcfRecord per file. See src/utils/load_class_file.rs.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name"],
+  "required": [
+    "name"
+  ],
   "properties": {
     "name": {
       "type": "string",
@@ -22,12 +24,30 @@
       "minimum": 0,
       "description": "Stat group bucket the class belongs to."
     },
-    "str": { "type": "integer", "minimum": 0 },
-    "intl": { "type": "integer", "minimum": 0 },
-    "wis": { "type": "integer", "minimum": 0 },
-    "agi": { "type": "integer", "minimum": 0 },
-    "con": { "type": "integer", "minimum": 0 },
-    "cha": { "type": "integer", "minimum": 0 },
+    "str": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "intl": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wis": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "agi": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "con": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cha": {
+      "type": "integer",
+      "minimum": 0
+    },
     "unarmed_attack_ms": {
       "type": "integer",
       "minimum": 1,
@@ -44,6 +64,42 @@
       "type": "boolean",
       "default": true,
       "description": "Whether players can pick this class at character creation. Default true; uncheck to hide an unfinished class. Enforced server-side and pushed live to the eoweb class picker (no deploy)."
+    },
+    "growth_str": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Automatic per-level stat growth applied on level-up, on top of the free points the player allocates (see ClassRates in load_class_rates_file.rs). The class identity package \u2014 e.g. Warrior +2 STR/+1 CON, Archer +2 AGI/+1 CON. 0 = no automatic STR growth."
+    },
+    "growth_int": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Automatic per-level stat growth applied on level-up, on top of the free points the player allocates (see ClassRates in load_class_rates_file.rs). The class identity package \u2014 e.g. Warrior +2 STR/+1 CON, Archer +2 AGI/+1 CON. 0 = no automatic INT growth."
+    },
+    "growth_wis": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Automatic per-level stat growth applied on level-up, on top of the free points the player allocates (see ClassRates in load_class_rates_file.rs). The class identity package \u2014 e.g. Warrior +2 STR/+1 CON, Archer +2 AGI/+1 CON. 0 = no automatic WIS growth."
+    },
+    "growth_agi": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Automatic per-level stat growth applied on level-up, on top of the free points the player allocates (see ClassRates in load_class_rates_file.rs). The class identity package \u2014 e.g. Warrior +2 STR/+1 CON, Archer +2 AGI/+1 CON. 0 = no automatic AGI growth."
+    },
+    "growth_con": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Automatic per-level stat growth applied on level-up, on top of the free points the player allocates (see ClassRates in load_class_rates_file.rs). The class identity package \u2014 e.g. Warrior +2 STR/+1 CON, Archer +2 AGI/+1 CON. 0 = no automatic CON growth."
+    },
+    "growth_cha": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Automatic per-level stat growth applied on level-up, on top of the free points the player allocates (see ClassRates in load_class_rates_file.rs). The class identity package \u2014 e.g. Warrior +2 STR/+1 CON, Archer +2 AGI/+1 CON. 0 = no automatic CHA growth."
     }
   }
 }
