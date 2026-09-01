@@ -80,6 +80,47 @@ const PLAIN_ARROW_SHAPE: ArrowShapeDef = {
  *  must always exist. */
 export const ARROW_SHAPES: Record<string, ArrowShapeDef> = {
   plain: PLAIN_ARROW_SHAPE,
+  flame: {
+    id: 'flame',
+    defaultElement: 'fire',
+    head: 'barbed',
+    lengthScale: 1,
+    headScale: 1.15,
+    shaftScale: 1,
+  },
+  frost: {
+    id: 'frost',
+    defaultElement: 'water',
+    head: 'diamond',
+    lengthScale: 1,
+    headScale: 1.1,
+    shaftScale: 1,
+  },
+  bolt: {
+    id: 'bolt',
+    defaultElement: 'neutral',
+    head: 'triangle',
+    // Short and thick: a crossbow bolt, not an arrow.
+    lengthScale: 0.78,
+    headScale: 0.95,
+    shaftScale: 1.5,
+  },
+  bone: {
+    id: 'bone',
+    defaultElement: 'earth',
+    head: 'barbed',
+    lengthScale: 1.05,
+    headScale: 1,
+    shaftScale: 1.25,
+  },
+  spirit: {
+    id: 'spirit',
+    defaultElement: 'dark',
+    head: 'leaf',
+    lengthScale: 0.95,
+    headScale: 1.2,
+    shaftScale: 0.8,
+  },
 };
 
 export const DEFAULT_ARROW_SHAPE = 'plain';
