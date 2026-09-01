@@ -154,7 +154,6 @@ export function isArrowShapeId(id: string): boolean {
 export type ArrowTrailKind = 'embers' | 'frost' | 'wisp';
 
 export interface ArrowTrailDef {
-  kind: ArrowTrailKind;
   /** How long one mote lives, ms. */
   lifeMs: number;
   /** Emit one mote per this many ms of flight. lifeMs / emitMs is roughly the
@@ -174,7 +173,6 @@ export interface ArrowTrailDef {
  *  authored text and needs the isArrowShapeId guard. */
 export const ARROW_TRAILS: Record<ArrowTrailKind, ArrowTrailDef> = {
   embers: {
-    kind: 'embers',
     lifeMs: 260,
     emitMs: 28,
     driftX: 0.004,
@@ -183,7 +181,6 @@ export const ARROW_TRAILS: Record<ArrowTrailKind, ArrowTrailDef> = {
     spread: 1.6,
   },
   frost: {
-    kind: 'frost',
     lifeMs: 300,
     emitMs: 34,
     driftX: 0,
@@ -192,7 +189,6 @@ export const ARROW_TRAILS: Record<ArrowTrailKind, ArrowTrailDef> = {
     spread: 2.2,
   },
   wisp: {
-    kind: 'wisp',
     lifeMs: 340,
     emitMs: 40,
     driftX: 0,
@@ -424,6 +420,16 @@ export function drawArrowCanvas(
   ctx.fill();
 
   return canvas;
+}
+
+/** A mote's opacity at normalised age `t` (0 = just born, 1 = expired):
+ *  lingers near full strength, then eases out quickly toward the end of its
+ *  life. The SOLE source for this curve — eoweb's TrailParticle.alpha getter
+ *  and the AIO editor's frozen-pose preview both call this rather than
+ *  each carrying their own `1 - t * t`, so retuning the fade here can never
+ *  silently desync the two the way a duplicated formula could. */
+export function moteAlpha(t: number): number {
+  return Math.max(0, 1 - t * t);
 }
 
 /** Deterministic per-mote offset. The engine NEVER calls Math.random():

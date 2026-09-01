@@ -8,6 +8,7 @@ import {
   DEFAULT_ARROW_SHAPE,
   drawArrowCanvas,
   drawMoteCanvas,
+  moteAlpha,
   moteJitter,
 } from "../../vfx-engine";
 
@@ -69,7 +70,15 @@ const MOTE_STEP_PX = 5;
 //     purpose, for headroom.
 // These three offsets don't necessarily point the same way, so summing their
 // magnitudes is a safe (if slightly loose) upper bound on the true worst
-// case. +4px pad on top, then round up.
+// case, MEASURED FROM THE ARROW'S CENTRE.
+//
+// The canvas margin is not measured from the centre, though — the arrow art
+// is blitted at (TRAIL_MARGIN, TRAIL_MARGIN), so its own centre already sits
+// ARROW_CANVAS_SIZE / 2 inside the padded edge (see the drawImage call
+// below). Subtracting that here is what turns a worst-case-from-centre
+// distance into the actual pixels of margin still needed outside the arrow's
+// own canvas; skipping it once padded every trail kind by a spurious extra
+// 18px of dead space. +4px pad on top of that, then round up.
 //
 // ARROW_CANVAS_SIZE itself is untouched: it's the game's sprite size, and
 // changing it would shift every arrow's centre in the actual game.
@@ -81,7 +90,9 @@ const TRAIL_MARGIN = Math.ceil(
         def.spread +
         Math.hypot(def.driftX, def.driftY) * def.lifeMs,
     ),
-  ) + 4,
+  ) +
+    4 -
+    ARROW_CANVAS_SIZE / 2,
 );
 const PREVIEW_CANVAS_SIZE = ARROW_CANVAS_SIZE + TRAIL_MARGIN;
 
@@ -138,8 +149,19 @@ function ShapePreview({ shapeId }: { shapeId: string }) {
           -UX * (i * MOTE_STEP_PX) + j.x * def.spread + def.driftX * ageMs;
         const by =
           -UY * (i * MOTE_STEP_PX) + j.y * def.spread + def.driftY * ageMs;
-        ctx.globalAlpha = Math.max(0, 1 - t * t);
-        ctx.drawImage(mote, originX + bx, originY + by);
+        ctx.globalAlpha = moteAlpha(t);
+        // Centred on (originX + bx, originY + by), not top-left anchored:
+        // eoweb's TrailParticle sets `sprite.anchor.set(0.5)`
+        // (src/render/trail-particle.ts), so the game centres every mote on
+        // its point. drawImage has no anchor concept — it always paints from
+        // the top-left corner — so the offset below is what makes this
+        // preview land on the same pixel the game does instead of sitting
+        // half a mote-width down-right of it.
+        ctx.drawImage(
+          mote,
+          originX + bx - mote.width / 2,
+          originY + by - mote.height / 2,
+        );
       }
       // Canvas2D context state is sticky — reset before returning, or every
       // later draw on this context (including the next shape's arrow, since
