@@ -1388,7 +1388,24 @@ function VfxSuggestField({ schema, value, onChange, path, label, required, compa
  *  VfxSuggestField: ArrowKindPicker renders several controls, and a single
  *  <label> wrapping all of them would associate the caption with whichever
  *  one the browser picks. */
-function ArrowKindSuggestField({ schema, value, onChange, path, label, required, compact }: CommonProps) {
+/** ItemType.Weapon (eolib). Only a weapon's arrow_kind is ever read: the
+ *  client resolves the shape from `client.equipment.weapon`, so a kind
+ *  authored on the ARROWS (shield slot) or on any other item is carried all
+ *  the way to the client and then never consulted. Offering an identical
+ *  picker on every item made that invisible — hence the gate below. */
+const ITEM_TYPE_WEAPON = 10;
+
+function ArrowKindSuggestField(props: CommonProps) {
+  const { schema, value, onChange, path, label, required, compact } = props;
+  const itemType =
+    typeof props.siblings?.type === "number"
+      ? (props.siblings.type as number)
+      : undefined;
+  const current = typeof value === "string" ? value : "";
+  // `undefined` means we have no sibling context (not an object field) — show
+  // the picker rather than hiding a control on a guess.
+  const applies = itemType === undefined || itemType === ITEM_TYPE_WEAPON;
+
   return (
     <div className="group/field block">
       <FieldLabel
@@ -1398,10 +1415,25 @@ function ArrowKindSuggestField({ schema, value, onChange, path, label, required,
         path={path}
         compact={compact}
       />
-      <ArrowKindPicker
-        value={typeof value === "string" ? value : ""}
-        onChange={(next) => onChange(next)}
-      />
+      {applies ? (
+        <ArrowKindPicker value={current} onChange={(next) => onChange(next)} />
+      ) : (
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <span>
+            Weapons only — the client reads this from the equipped weapon, so
+            it has no effect on this item.
+          </span>
+          {current ? (
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="shrink-0 rounded border border-slate-700 px-2 py-0.5 text-slate-300 transition hover:border-slate-500 hover:bg-slate-800/60"
+            >
+              clear "{current}"
+            </button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
