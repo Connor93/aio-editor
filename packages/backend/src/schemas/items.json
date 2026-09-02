@@ -2,92 +2,223 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://aio-editor/schemas/items.json",
   "title": "Item",
-  "description": "REOSERV data/pub/items/<id>.json — one EifRecord per file. See src/utils/load_item_file.rs. type/subtype/special/element/size are enum integers; see eolib::protocol::pub.",
+  "description": "REOSERV data/pub/items/<id>.json \u2014 one EifRecord per file. See src/utils/load_item_file.rs. type/subtype/special/element/size are enum integers; see eolib::protocol::pub.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name"],
+  "required": [
+    "name"
+  ],
   "x-aio-groups": [
     {
       "label": "Identity",
-      "fields": ["name", "graphic_id", "spec1"]
+      "fields": [
+        "name",
+        "graphic_id",
+        "spec1"
+      ]
     },
     {
       "label": "Type",
       "description": "Type/subtype/special control how the item behaves; size controls inventory packing.",
-      "fields": ["type", "subtype", "special", "size", "weight"]
+      "fields": [
+        "type",
+        "subtype",
+        "special",
+        "size",
+        "weight"
+      ]
     },
     {
       "label": "Combat",
-      "fields": ["hp", "tp", "min_damage", "max_damage", "accuracy", "evade", "armor", "return_damage", "attack_rate_ms", "range", "arrow_kind"]
+      "fields": [
+        "hp",
+        "tp",
+        "min_damage",
+        "max_damage",
+        "accuracy",
+        "evade",
+        "armor",
+        "return_damage",
+        "attack_rate_ms",
+        "range",
+        "arrow_kind"
+      ]
     },
     {
       "label": "Character Stats",
       "layout": "inline",
-      "fields": ["str", "intl", "wis", "agi", "con", "cha"]
+      "fields": [
+        "str",
+        "intl",
+        "wis",
+        "agi",
+        "con",
+        "cha"
+      ]
     },
     {
       "label": "Element",
-      "fields": ["element", "element_damage", "element_roll_table"]
+      "fields": [
+        "element",
+        "element_damage",
+        "element_roll_table"
+      ]
     },
     {
       "label": "Resistances",
       "layout": "inline",
-      "fields": ["light_resistance", "dark_resistance", "earth_resistance", "air_resistance", "water_resistance", "fire_resistance"]
+      "fields": [
+        "light_resistance",
+        "dark_resistance",
+        "earth_resistance",
+        "air_resistance",
+        "water_resistance",
+        "fire_resistance"
+      ]
     },
     {
       "label": "Type-Specific Specs",
-      "description": "spec2/spec3 have meanings that vary by item type — see the loader.",
-      "fields": ["spec2", "spec3"]
+      "description": "spec2/spec3 have meanings that vary by item type \u2014 see the loader.",
+      "fields": [
+        "spec2",
+        "spec3"
+      ]
     },
     {
       "label": "Requirements",
-      "fields": ["level_requirement", "class_requirement"]
+      "fields": [
+        "level_requirement",
+        "class_requirement"
+      ]
     },
     {
       "label": "Stat Requirements",
       "layout": "inline",
-      "fields": ["str_requirement", "int_requirement", "wis_requirement", "agi_requirement", "con_requirement", "cha_requirement"]
+      "fields": [
+        "str_requirement",
+        "int_requirement",
+        "wis_requirement",
+        "agi_requirement",
+        "con_requirement",
+        "cha_requirement"
+      ]
     },
     {
       "label": "Preset Modifiers",
       "description": "Guaranteed mods on every rolled instance of this item. Set preset_rarity to fix the tint + slot count; pin any subset via preset_mods (empty slots roll). A fixed value is used verbatim; omit value to roll by level.",
-      "fields": ["preset_rarity", "preset_level", "preset_mods"]
+      "fields": [
+        "preset_rarity",
+        "preset_level",
+        "preset_mods"
+      ]
     }
   ],
   "properties": {
-    "name": { "type": "string", "minLength": 1 },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
     "graphic_id": {
       "type": "integer",
       "minimum": 0,
-      "x-aio-display": { "kind": "gfx", "category": "items" }
+      "x-aio-display": {
+        "kind": "gfx",
+        "category": "items"
+      }
     },
     "type": {
       "type": "integer",
       "minimum": 0,
       "description": "ItemType enum (eolib).",
       "x-aio-options": [
-        { "value": 0, "label": "General" },
-        { "value": 2, "label": "Currency" },
-        { "value": 3, "label": "Heal" },
-        { "value": 4, "label": "Teleport" },
-        { "value": 6, "label": "ExpReward" },
-        { "value": 9, "label": "Key" },
-        { "value": 10, "label": "Weapon" },
-        { "value": 11, "label": "Shield" },
-        { "value": 12, "label": "Armor" },
-        { "value": 13, "label": "Hat" },
-        { "value": 14, "label": "Boots" },
-        { "value": 15, "label": "Gloves" },
-        { "value": 16, "label": "Accessory" },
-        { "value": 17, "label": "Belt" },
-        { "value": 18, "label": "Necklace" },
-        { "value": 19, "label": "Ring" },
-        { "value": 20, "label": "Armlet" },
-        { "value": 21, "label": "Bracer" },
-        { "value": 22, "label": "Alcohol" },
-        { "value": 23, "label": "EffectPotion" },
-        { "value": 24, "label": "HairDye" },
-        { "value": 25, "label": "CureCurse" }
+        {
+          "value": 0,
+          "label": "General"
+        },
+        {
+          "value": 2,
+          "label": "Currency"
+        },
+        {
+          "value": 3,
+          "label": "Heal"
+        },
+        {
+          "value": 4,
+          "label": "Teleport"
+        },
+        {
+          "value": 6,
+          "label": "ExpReward"
+        },
+        {
+          "value": 9,
+          "label": "Key"
+        },
+        {
+          "value": 10,
+          "label": "Weapon"
+        },
+        {
+          "value": 11,
+          "label": "Shield"
+        },
+        {
+          "value": 12,
+          "label": "Armor"
+        },
+        {
+          "value": 13,
+          "label": "Hat"
+        },
+        {
+          "value": 14,
+          "label": "Boots"
+        },
+        {
+          "value": 15,
+          "label": "Gloves"
+        },
+        {
+          "value": 16,
+          "label": "Accessory"
+        },
+        {
+          "value": 17,
+          "label": "Belt"
+        },
+        {
+          "value": 18,
+          "label": "Necklace"
+        },
+        {
+          "value": 19,
+          "label": "Ring"
+        },
+        {
+          "value": 20,
+          "label": "Armlet"
+        },
+        {
+          "value": 21,
+          "label": "Bracer"
+        },
+        {
+          "value": 22,
+          "label": "Alcohol"
+        },
+        {
+          "value": 23,
+          "label": "EffectPotion"
+        },
+        {
+          "value": 24,
+          "label": "HairDye"
+        },
+        {
+          "value": 25,
+          "label": "CureCurse"
+        }
       ]
     },
     "subtype": {
@@ -100,14 +231,32 @@
       "minimum": 0,
       "description": "ItemSpecial enum (eolib)."
     },
-    "hp": { "type": "integer" },
-    "tp": { "type": "integer" },
-    "min_damage": { "type": "integer", "minimum": 0 },
-    "max_damage": { "type": "integer", "minimum": 0 },
-    "accuracy": { "type": "integer" },
-    "evade": { "type": "integer" },
-    "armor": { "type": "integer" },
-    "return_damage": { "type": "integer" },
+    "hp": {
+      "type": "integer"
+    },
+    "tp": {
+      "type": "integer"
+    },
+    "min_damage": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_damage": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "accuracy": {
+      "type": "integer"
+    },
+    "evade": {
+      "type": "integer"
+    },
+    "armor": {
+      "type": "integer"
+    },
+    "return_damage": {
+      "type": "integer"
+    },
     "attack_rate_ms": {
       "type": "integer",
       "minimum": 1,
@@ -123,50 +272,127 @@
       "maxLength": 64,
       "description": "Bows only: what this weapon's arrows look like. The arrow is coloured by the weapon's rolled element when it has one, otherwise by the shape's own default element. Leave empty for a plain arrow."
     },
-    "str": { "type": "integer" },
-    "intl": { "type": "integer" },
-    "wis": { "type": "integer" },
-    "agi": { "type": "integer" },
-    "con": { "type": "integer" },
-    "cha": { "type": "integer" },
-    "light_resistance": { "type": "integer" },
-    "dark_resistance": { "type": "integer" },
-    "earth_resistance": { "type": "integer" },
-    "air_resistance": { "type": "integer" },
-    "water_resistance": { "type": "integer" },
-    "fire_resistance": { "type": "integer" },
+    "str": {
+      "type": "integer"
+    },
+    "intl": {
+      "type": "integer"
+    },
+    "wis": {
+      "type": "integer"
+    },
+    "agi": {
+      "type": "integer"
+    },
+    "con": {
+      "type": "integer"
+    },
+    "cha": {
+      "type": "integer"
+    },
+    "light_resistance": {
+      "type": "integer"
+    },
+    "dark_resistance": {
+      "type": "integer"
+    },
+    "earth_resistance": {
+      "type": "integer"
+    },
+    "air_resistance": {
+      "type": "integer"
+    },
+    "water_resistance": {
+      "type": "integer"
+    },
+    "fire_resistance": {
+      "type": "integer"
+    },
     "spec1": {
       "type": "integer",
-      "description": "Equippables (weapon/shield/armor/hat/boots): the ON-CHARACTER worn graphic drawn on the map sprite — use the picker. 0 leaves the item invisible on the character even though its inventory icon still shows. Other item types: type-dependent (ammo/heal/etc.).",
-      "x-aio-display": { "kind": "worn_gfx" }
+      "description": "Equippables (weapon/shield/armor/hat/boots): the ON-CHARACTER worn graphic drawn on the map sprite \u2014 use the picker. 0 leaves the item invisible on the character even though its inventory icon still shows. Other item types: type-dependent (ammo/heal/etc.).",
+      "x-aio-display": {
+        "kind": "worn_gfx"
+      }
     },
-    "spec2": { "type": "integer", "description": "Type-dependent (see spec1)." },
-    "spec3": { "type": "integer", "description": "Type-dependent (see spec1)." },
-    "level_requirement": { "type": "integer", "minimum": 0 },
+    "spec2": {
+      "type": "integer",
+      "description": "Type-dependent (see spec1). ARMOR (type 12): this is the GENDER the armor is for \u2014 0 = Female, 1 = Male. The server rejects an equip whose spec2 does not match the character's gender (character/equip.rs), so a mis-set value makes the armor unequippable for everyone. Other types: type-dependent."
+    },
+    "spec3": {
+      "type": "integer",
+      "description": "Type-dependent (see spec1)."
+    },
+    "level_requirement": {
+      "type": "integer",
+      "minimum": 0
+    },
     "class_requirement": {
       "type": "integer",
       "minimum": 0,
       "description": "Required class id; 0 = any class.",
-      "x-aio-ref": { "type": "classes", "noneLabel": "(any class)" }
+      "x-aio-ref": {
+        "type": "classes",
+        "noneLabel": "(any class)"
+      }
     },
-    "str_requirement": { "type": "integer", "minimum": 0 },
-    "int_requirement": { "type": "integer", "minimum": 0 },
-    "wis_requirement": { "type": "integer", "minimum": 0 },
-    "agi_requirement": { "type": "integer", "minimum": 0 },
-    "con_requirement": { "type": "integer", "minimum": 0 },
-    "cha_requirement": { "type": "integer", "minimum": 0 },
+    "str_requirement": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "int_requirement": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wis_requirement": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "agi_requirement": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "con_requirement": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cha_requirement": {
+      "type": "integer",
+      "minimum": 0
+    },
     "element": {
       "type": "integer",
       "minimum": 0,
-      "description": "DEPRECATED. Use element_roll_table on weapons instead — the rolled instance's element overrides this field, which is no longer read by combat. Kept for legacy data only.",
+      "description": "DEPRECATED. Use element_roll_table on weapons instead \u2014 the rolled instance's element overrides this field, which is no longer read by combat. Kept for legacy data only.",
       "x-aio-options": [
-        { "value": 0, "label": "None" },
-        { "value": 1, "label": "Light" },
-        { "value": 2, "label": "Dark" },
-        { "value": 3, "label": "Earth" },
-        { "value": 4, "label": "Wind" },
-        { "value": 5, "label": "Water" },
-        { "value": 6, "label": "Fire" }
+        {
+          "value": 0,
+          "label": "None"
+        },
+        {
+          "value": 1,
+          "label": "Light"
+        },
+        {
+          "value": 2,
+          "label": "Dark"
+        },
+        {
+          "value": 3,
+          "label": "Earth"
+        },
+        {
+          "value": 4,
+          "label": "Wind"
+        },
+        {
+          "value": 5,
+          "label": "Water"
+        },
+        {
+          "value": 6,
+          "label": "Fire"
+        }
       ]
     },
     "element_damage": {
@@ -181,22 +407,58 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["element", "weight"],
+        "required": [
+          "element",
+          "weight"
+        ],
         "properties": {
           "element": {
             "type": "string",
-            "enum": ["plain", "fire", "water", "earth", "wind", "light", "dark"],
+            "enum": [
+              "plain",
+              "fire",
+              "water",
+              "earth",
+              "wind",
+              "light",
+              "dark"
+            ],
             "x-aio-options": [
-              { "value": "plain", "label": "Plain" },
-              { "value": "fire", "label": "Fire" },
-              { "value": "water", "label": "Water" },
-              { "value": "earth", "label": "Earth" },
-              { "value": "wind", "label": "Wind" },
-              { "value": "light", "label": "Light" },
-              { "value": "dark", "label": "Dark" }
+              {
+                "value": "plain",
+                "label": "Plain"
+              },
+              {
+                "value": "fire",
+                "label": "Fire"
+              },
+              {
+                "value": "water",
+                "label": "Water"
+              },
+              {
+                "value": "earth",
+                "label": "Earth"
+              },
+              {
+                "value": "wind",
+                "label": "Wind"
+              },
+              {
+                "value": "light",
+                "label": "Light"
+              },
+              {
+                "value": "dark",
+                "label": "Dark"
+              }
             ]
           },
-          "weight": { "type": "integer", "minimum": 1, "default": 1 }
+          "weight": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          }
         }
       },
       "default": []
@@ -204,12 +466,29 @@
     "preset_rarity": {
       "type": "string",
       "description": "Optional. Pins the rarity tier (tint + random-mod budget). Leave unset for drops (rarity rolls at drop time).",
-      "enum": ["common", "rare", "epic", "legendary"],
+      "enum": [
+        "common",
+        "rare",
+        "epic",
+        "legendary"
+      ],
       "x-aio-options": [
-        { "value": "common", "label": "Common (1 slot)" },
-        { "value": "rare", "label": "Rare (2 slots)" },
-        { "value": "epic", "label": "Epic (3 slots)" },
-        { "value": "legendary", "label": "Legendary (4 slots)" }
+        {
+          "value": "common",
+          "label": "Common (1 slot)"
+        },
+        {
+          "value": "rare",
+          "label": "Rare (2 slots)"
+        },
+        {
+          "value": "epic",
+          "label": "Epic (3 slots)"
+        },
+        {
+          "value": "legendary",
+          "label": "Legendary (4 slots)"
+        }
       ]
     },
     "preset_level": {
@@ -224,12 +503,17 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["mod_id"],
+        "required": [
+          "mod_id"
+        ],
         "properties": {
           "mod_id": {
             "type": "string",
             "description": "The modifier to pin. Pick by name; the stored value is the modifier's id (e.g. fire_dmg).",
-            "x-aio-ref": { "type": "modifiers", "by": "filename-stem" }
+            "x-aio-ref": {
+              "type": "modifiers",
+              "by": "filename-stem"
+            }
           },
           "value": {
             "type": "number",
@@ -239,20 +523,47 @@
       },
       "default": []
     },
-    "weight": { "type": "integer", "minimum": 0 },
+    "weight": {
+      "type": "integer",
+      "minimum": 0
+    },
     "size": {
       "type": "integer",
       "minimum": 0,
       "description": "ItemSize enum (eolib).",
       "x-aio-options": [
-        { "value": 0, "label": "1x1" },
-        { "value": 1, "label": "1x2" },
-        { "value": 2, "label": "1x3" },
-        { "value": 3, "label": "1x4" },
-        { "value": 4, "label": "2x1" },
-        { "value": 5, "label": "2x2" },
-        { "value": 6, "label": "2x3" },
-        { "value": 7, "label": "2x4" }
+        {
+          "value": 0,
+          "label": "1x1"
+        },
+        {
+          "value": 1,
+          "label": "1x2"
+        },
+        {
+          "value": 2,
+          "label": "1x3"
+        },
+        {
+          "value": 3,
+          "label": "1x4"
+        },
+        {
+          "value": 4,
+          "label": "2x1"
+        },
+        {
+          "value": 5,
+          "label": "2x2"
+        },
+        {
+          "value": 6,
+          "label": "2x3"
+        },
+        {
+          "value": 7,
+          "label": "2x4"
+        }
       ]
     }
   }
