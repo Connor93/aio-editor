@@ -102,7 +102,7 @@
         {"value":"accuracy","label":"Accuracy"},{"value":"evasion","label":"Evasion"},{"value":"armor","label":"Armor"},
         {"value":"crit_chance","label":"Crit chance"},{"value":"crit_damage","label":"Crit damage"},
         {"value":"crit_damage_taken","label":"Crit damage taken"},{"value":"crit_resistance","label":"Crit resistance"},
-        {"value":"attack_speed","label":"Attack speed"},{"value":"move_speed","label":"Move speed"},
+        {"value":"attack_speed","label":"Attack speed (×)","description":"Multiplier on attack speed, starting at 1.0. A single 0.3 (any kind) = 30% faster attacks (interval ÷ 1.3); negative values slow. Kinds only differ when several stack. Can't go faster than the server's 240ms attack floor. Only self HP/TP/zone conditions apply to speed. Takes effect live when the status is applied or ends."},{"value":"move_speed","label":"Move speed (×)","description":"Multiplier on movement speed, starting at 1.0. A single 0.3 (any kind) = 30% faster movement (interval ÷ 1.3); negative values slow. Kinds only differ when several stack. Can't go faster than the server's 120ms movement floor. Only self HP/TP/zone conditions apply to speed. Takes effect live when the status is applied or ends."},
         {"value":"damage_dealt_fire","label":"Damage dealt: Fire"},{"value":"damage_dealt_water","label":"Damage dealt: Water"},
         {"value":"damage_dealt_earth","label":"Damage dealt: Earth"},{"value":"damage_dealt_wind","label":"Damage dealt: Wind"},
         {"value":"damage_dealt_light","label":"Damage dealt: Light"},{"value":"damage_dealt_dark","label":"Damage dealt: Dark"},
