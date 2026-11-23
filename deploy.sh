@@ -40,6 +40,13 @@ echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 docker push "$BACKEND_IMAGE"
 docker push "$FRONTEND_IMAGE"
 
+# Reclaim local Docker disk: both images are on GHCR now, and BuildKit's cache
+# is capped at 6GB (shared with the reoserv/eoweb deploy scripts) so repeated
+# builds can't fill the Mac — a full disk surfaces as Docker EIO.
+echo "🧹 Pruning local Docker images + build cache (cap 6GB) ..."
+docker image rm "$BACKEND_IMAGE" "$FRONTEND_IMAGE" >/dev/null 2>&1 || true
+docker builder prune -f --max-used-space 6gb >/dev/null || true
+
 # ── GFX assets → origin-gfx (content-addressed) ──
 # The editor serves preview PNGs from GFX_ROOT/gfxNNN/<resource_id>.png, and the
 # embedded eomap-js loads the map .egf files straight out of the same volume.
