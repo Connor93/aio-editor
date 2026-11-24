@@ -13,11 +13,20 @@
     "cost": { "type": "object", "additionalProperties": false,
       "properties": { "hp": { "type": "integer", "default": 0 }, "tp": { "type": "integer", "default": 0 } } },
     "cooldown_ms": { "type": "integer", "minimum": 0, "default": 0 },
-    "target": { "type": "string", "default": "self_only", "enum": ["self_only", "single_enemy"], "x-aio-options": [
+    "target": { "type": "string", "default": "self_only", "enum": ["self_only", "single_enemy", "ground_area"], "x-aio-options": [
       { "value": "self_only", "label": "Self only" },
-      { "value": "single_enemy", "label": "Single enemy" } ] },
+      { "value": "single_enemy", "label": "Single enemy" },
+      { "value": "ground_area", "label": "Ground area" } ] },
     "range": { "type": "integer", "minimum": 0, "maximum": 252, "default": 0,
       "description": "Cast range in tiles (0 = use weapon range)." },
+    "area_radius": { "type": "integer", "minimum": 1, "maximum": 252, "default": 1,
+      "description": "Ground area: blast square radius in tiles (1 = 3×3)." },
+    "area_max_targets": { "type": "integer", "minimum": 0, "maximum": 252, "default": 0,
+      "description": "Ground area: most enemies hit, closest to the aimed tile first; 0 = no limit." },
+    "area_throw_blocked": { "type": "boolean", "default": true,
+      "description": "Ground area: a wall between you and the aimed tile prevents the cast." },
+    "area_blast_blocked": { "type": "boolean", "default": true,
+      "description": "Ground area: enemies behind a wall from the aimed tile are not hit." },
     "kind": { "type": "string", "default": "active", "enum": ["active", "toggle"], "x-aio-options": [
       { "value": "active", "label": "Active" },
       { "value": "toggle", "label": "Toggle" } ] },
