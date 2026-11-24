@@ -27,6 +27,10 @@
       "description": "Ground area: a wall between you and the aimed tile prevents the cast." },
     "area_blast_blocked": { "type": "boolean", "default": true,
       "description": "Ground area: enemies behind a wall from the aimed tile are not hit." },
+    "area_duration_ms": { "type": "integer", "minimum": 0, "maximum": 60000, "default": 0,
+      "description": "Ground area: how long the area lasts, in ms. 0 = instant (one volley)." },
+    "area_interval_ms": { "type": "integer", "minimum": 250, "maximum": 60000, "default": 1000,
+      "description": "Ground area: time between waves, in ms. Use multiples of 250." },
     "kind": { "type": "string", "default": "active", "enum": ["active", "toggle"], "x-aio-options": [
       { "value": "active", "label": "Active" },
       { "value": "toggle", "label": "Toggle" } ] },
